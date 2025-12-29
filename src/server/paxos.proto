@@ -1,0 +1,37 @@
+syntax = "proto3";
+option go_package = "./main";
+
+message PrepareMessage{
+  uint64 paxos_id = 1;
+  uint64 sender_lease = 2;
+  uint64 round = 3;
+}
+
+message PromiseMessage{
+  uint64 paxos_id = 1;
+  uint64 sender_lease = 2;
+  uint64 round = 3;
+  bool ack = 4;
+  uint64 last_good_round = 5;
+  string value = 6;
+}
+
+message AcceptMessage{
+  uint64 paxos_id = 1;
+  uint64 sender_lease = 2;
+  uint64 round = 3;
+  string value = 4;
+}
+
+message AcceptedMessage{
+  uint64 paxos_id = 1;
+  uint64 sender_lease = 2;
+  uint64 round = 3;
+  bool ack = 4;
+  string value = 5;
+}
+
+service Paxos{
+  rpc Prepare(PrepareMessage) returns (PromiseMessage) {}
+  rpc Accept(AcceptMessage) returns (AcceptedMessage) {}
+}
