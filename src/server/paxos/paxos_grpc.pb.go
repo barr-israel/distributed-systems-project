@@ -4,13 +4,14 @@
 // - protoc             v6.33.1
 // source: paxos.proto
 
-package main
+package paxos
 
 import (
 	context "context"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -19,8 +20,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Paxos_Prepare_FullMethodName = "/Paxos/Prepare"
-	Paxos_Accept_FullMethodName  = "/Paxos/Accept"
+	Paxos_Prepare_FullMethodName       = "/Paxos/Prepare"
+	Paxos_Accept_FullMethodName        = "/Paxos/Accept"
+	Paxos_Accepted_FullMethodName      = "/Paxos/Accepted"
+	Paxos_InitiateRound_FullMethodName = "/Paxos/InitiateRound"
 )
 
 // PaxosClient is the client API for Paxos service.
@@ -28,7 +31,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PaxosClient interface {
 	Prepare(ctx context.Context, in *PrepareMessage, opts ...grpc.CallOption) (*PromiseMessage, error)
-	Accept(ctx context.Context, in *AcceptMessage, opts ...grpc.CallOption) (*AcceptedMessage, error)
+	Accept(ctx context.Context, in *AcceptMessage, opts ...grpc.CallOption) (*AcceptResponse, error)
+	Accepted(ctx context.Context, in *AcceptedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	InitiateRound(ctx context.Context, in *InitiatiationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type paxosClient struct {
@@ -49,10 +54,30 @@ func (c *paxosClient) Prepare(ctx context.Context, in *PrepareMessage, opts ...g
 	return out, nil
 }
 
-func (c *paxosClient) Accept(ctx context.Context, in *AcceptMessage, opts ...grpc.CallOption) (*AcceptedMessage, error) {
+func (c *paxosClient) Accept(ctx context.Context, in *AcceptMessage, opts ...grpc.CallOption) (*AcceptResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AcceptedMessage)
+	out := new(AcceptResponse)
 	err := c.cc.Invoke(ctx, Paxos_Accept_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paxosClient) Accepted(ctx context.Context, in *AcceptedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Paxos_Accepted_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paxosClient) InitiateRound(ctx context.Context, in *InitiatiationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, Paxos_InitiateRound_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +89,9 @@ func (c *paxosClient) Accept(ctx context.Context, in *AcceptMessage, opts ...grp
 // for forward compatibility.
 type PaxosServer interface {
 	Prepare(context.Context, *PrepareMessage) (*PromiseMessage, error)
-	Accept(context.Context, *AcceptMessage) (*AcceptedMessage, error)
+	Accept(context.Context, *AcceptMessage) (*AcceptResponse, error)
+	Accepted(context.Context, *AcceptedMessage) (*emptypb.Empty, error)
+	InitiateRound(context.Context, *InitiatiationRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedPaxosServer()
 }
 
@@ -78,8 +105,14 @@ type UnimplementedPaxosServer struct{}
 func (UnimplementedPaxosServer) Prepare(context.Context, *PrepareMessage) (*PromiseMessage, error) {
 	return nil, status.Error(codes.Unimplemented, "method Prepare not implemented")
 }
-func (UnimplementedPaxosServer) Accept(context.Context, *AcceptMessage) (*AcceptedMessage, error) {
+func (UnimplementedPaxosServer) Accept(context.Context, *AcceptMessage) (*AcceptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Accept not implemented")
+}
+func (UnimplementedPaxosServer) Accepted(context.Context, *AcceptedMessage) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method Accepted not implemented")
+}
+func (UnimplementedPaxosServer) InitiateRound(context.Context, *InitiatiationRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method InitiateRound not implemented")
 }
 func (UnimplementedPaxosServer) mustEmbedUnimplementedPaxosServer() {}
 func (UnimplementedPaxosServer) testEmbeddedByValue()               {}
@@ -138,6 +171,42 @@ func _Paxos_Accept_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Paxos_Accepted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AcceptedMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).Accepted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_Accepted_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).Accepted(ctx, req.(*AcceptedMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Paxos_InitiateRound_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(InitiatiationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).InitiateRound(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_InitiateRound_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).InitiateRound(ctx, req.(*InitiatiationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Paxos_ServiceDesc is the grpc.ServiceDesc for Paxos service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +221,14 @@ var Paxos_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Accept",
 			Handler:    _Paxos_Accept_Handler,
+		},
+		{
+			MethodName: "Accepted",
+			Handler:    _Paxos_Accepted_Handler,
+		},
+		{
+			MethodName: "InitiateRound",
+			Handler:    _Paxos_InitiateRound_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

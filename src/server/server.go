@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -10,14 +11,15 @@ import (
 func main() {
 	setupConf()
 	var wg sync.WaitGroup
-	cli, kaCancel := EtcdSetup(&wg)
-	data := map[string]string{}
-	RecoverData(&data)
+	client := EtcdSetup(&wg)
+	// RecoverData(&data)
+	client.RefreshLeader(context.Background())
+	server, reads, writes, commited := paxos.SetupgRPC(context.Background(), &client)
 	awaitInterrupt()
 	log.Println("Shutting down")
-	kaCancel()
+	client.keepaliveCancel()
 	wg.Wait()
-	err := cli.Close()
+	err := client.client.Close()
 	if err != nil {
 		log.Panicln("Error closing etcd client")
 	}
