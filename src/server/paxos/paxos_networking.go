@@ -237,18 +237,29 @@ func (server *PaxosServerState) InitiateRound(ctx context.Context, msg *Initiati
 		}
 		prepareAckCount := uint64(0)
 		largestReceivedRound := uint64(0)
+		largestReceivedAckRound := uint64(0)
 		for range config.PaxosMemberCount {
 			res := <-responses
-			if res.LastGoodRound > largestReceivedRound {
-				largestReceivedRound = res.LastGoodRound
-				round = max(round, largestReceivedRound)
-				preference = res.Proposal.Actions
-			} else if res.LastGoodRound == largestReceivedRound {
-				preference = append(preference, res.Proposal.Actions...)
-			}
+			largestReceivedRound = max(res.LastGoodRound, largestReceivedRound)
 			if res.Ack {
+				if res.LastGoodRound > largestReceivedAckRound {
+					largestReceivedAckRound = res.LastGoodRound
+					preference = res.Proposal.Actions
+				}
+				// round = max(round, largestReceivedRound)
+				if largestReceivedAckRound == 0 {
+					// common case optimization: the leader can act as an N+1 participant with r'=0 with any proposal it wants, including merging all known proposals
+					preference = append(preference, res.Proposal.Actions...)
+				}
 				prepareAckCount++
 				if prepareAckCount > config.PaxosMemberCount/2 {
+					// read remaining promises incase they have more to merge, and once we have enough promises, it is guaranteed again that no accepts have been made
+					for len(responses) != 0 {
+						res := <-responses
+						if res.Ack {
+							preference = append(preference, res.Proposal.Actions...)
+						}
+					}
 					msg := AcceptMessage{PaxosId: thisPaxosID, Round: round, Proposal: &Proposal{Actions: preference}}
 					responses := make(chan *AcceptResponse, config.PaxosMemberCount)
 					for peerID := range config.PaxosMemberCount {
@@ -268,7 +279,8 @@ func (server *PaxosServerState) InitiateRound(ctx context.Context, msg *Initiati
 				}
 			}
 		}
-		round++
+		// skip ahead of every peer
+		round = max(round, largestReceivedRound) + 1
 	}
 }
 
