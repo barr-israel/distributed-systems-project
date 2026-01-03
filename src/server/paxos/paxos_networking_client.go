@@ -25,7 +25,7 @@ func (server *PaxosServerState) AsyncWrite(ctx context.Context, key string, valu
 }
 
 func (server *PaxosServerState) Write(ctx context.Context, key string, value *string) {
-	replyChannel := make(chan byte)
+	replyChannel := make(chan struct{})
 	server.incomingRequests <- PaxosLocalRequest{key: key, value: value, replyChannel: replyChannel}
 	server.notifyLeader(ctx)
 	<-replyChannel

@@ -19,7 +19,7 @@ import (
 type PaxosLocalRequest struct {
 	key          string
 	value        *string
-	replyChannel chan<- byte
+	replyChannel chan<- struct{}
 }
 
 type PaxosServerState struct {

@@ -20,7 +20,7 @@ type EtcdClient struct {
 	client          *clientv3.Client
 	leaseID         clientv3.LeaseID
 	keepAliveCancel context.CancelFunc
-	keepAliveDone   chan byte
+	keepAliveDone   chan struct{}
 }
 
 func (client *EtcdClient) WaitForEnoughReady() {
@@ -105,7 +105,7 @@ func (client *EtcdClient) Close() {
 }
 
 // hand written keep alive loop instead of session to allow revoking on manual disconnection
-func keepAlive(ctx context.Context, cli *clientv3.Client, leaseID clientv3.LeaseID, doneChannel chan byte) {
+func keepAlive(ctx context.Context, cli *clientv3.Client, leaseID clientv3.LeaseID, doneChannel chan struct{}) {
 	keepaliveCh, err := cli.KeepAlive(ctx, leaseID)
 	if err != nil {
 		util.SlogPanic("Failed to start KeepAlive")
@@ -133,7 +133,7 @@ func EtcdSetup() EtcdClient {
 		util.SlogPanic("Failed to grant lease")
 	}
 	kaCtx, kaCancel := context.WithCancel(context.Background())
-	keepAliveDone := make(chan byte)
+	keepAliveDone := make(chan struct{})
 	go keepAlive(kaCtx, cli, lease.ID, keepAliveDone)
 	slog.Info("etcd client connected")
 	client := EtcdClient{client: cli, leaseID: lease.ID, keepAliveCancel: kaCancel, keepAliveDone: keepAliveDone}
