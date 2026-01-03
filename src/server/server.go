@@ -2,28 +2,39 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
-	"sync"
+
+	"server/config"
+	"server/etcd"
+	"server/paxos"
 )
 
 func main() {
-	setupConf()
-	var wg sync.WaitGroup
-	client := EtcdSetup(&wg)
+	slog.SetLogLoggerLevel(slog.LevelDebug)
+	config.SetupConf()
+	client := etcd.EtcdSetup()
 	// RecoverData(&data)
-	client.RefreshLeader(context.Background())
-	server, reads, writes, commited := paxos.SetupgRPC(context.Background(), &client)
-	awaitInterrupt()
-	log.Println("Shutting down")
-	client.keepaliveCancel()
-	wg.Wait()
-	err := client.client.Close()
-	if err != nil {
-		log.Panicln("Error closing etcd client")
+	paxosServer := paxos.SetupGRPC(context.Background(), &client)
+	if config.PaxosMyID == 0 {
+		value := "world"
+		paxosServer.Write(context.Background(), "hello", &value)
+		slog.Debug("Write completed, trying to read")
+		slog.Debug("Read:", slog.String("value", *paxosServer.LinearizedRead(context.Background(), "hello")))
+		paxosServer.Write(context.Background(), "hello", nil)
+		slog.Debug("Delete completed, trying to read")
+		receivedValue := paxosServer.LinearizedRead(context.Background(), "hello")
+		if receivedValue != nil {
+			slog.Debug("Deletion failed, found ", slog.String("value", *receivedValue))
+		} else {
+			slog.Debug("Deletion succeeded")
+		}
 	}
-	log.Println("Shutdown complete")
+	awaitInterrupt()
+	slog.Info("Shutting down")
+	client.Close()
+	slog.Info("Shutdown complete")
 }
 
 func awaitInterrupt() {

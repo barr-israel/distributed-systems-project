@@ -1,37 +1,44 @@
+/*
+Package config is responsible for parsing and storing enviroment variable derived configuration values
+*/
 package config
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"strconv"
+
+	"server/util"
 )
 
 var (
-	PaxosMemberCount  uint16 = 0
-	PaxosStartingPort uint16 = 0
-	PaxosMyID         uint16 = 0
-	GRPCListenAddress string = ""
+	PaxosMemberCount    uint64 = 0
+	PaxosMyID           uint64 = 0
+	PaxosMaxReqPerRound int    = 0
+	PaxosListenAddress  string = ""
 )
 
-func setupConf() {
-	GRPCListenAddress = os.Getenv("GRPC_ADDRESS")
-	memberCountStr := os.Getenv("PAXOS_MEMBER_COUNT")
-	memberCount, err := strconv.ParseUint(memberCountStr, 10, 16)
+func parseStrConf(name string, defaultValue ...uint64) uint64 {
+	value := os.Getenv(name)
+	parsed, err := strconv.ParseUint(value, 10, 64)
 	if err != nil {
-		log.Panicln("PAXOS_MEMBER_COUNT not set/invalid")
+		if len(defaultValue) == 0 {
+			slog.Error("config value not set/invalid:", slog.String("name", name))
+			panic("config value not set/invalid: " + name)
+		} else {
+			slog.Warn("config value not set/invalid:", slog.String("name", name), slog.Uint64("default value", defaultValue[0]))
+		}
+		parsed = defaultValue[0]
 	}
-	PaxosMemberCount = uint16(memberCount)
-	startingPortStr := os.Getenv("PAXOS_STARTING_PORT")
-	startingPort, err := strconv.ParseUint(startingPortStr, 10, 16)
-	if err != nil {
-		log.Println("PAXOS_STARTING_PORT not set/invalid, defaulting to 9000")
-		startingPort = 9000
+	return parsed
+}
+
+func SetupConf() {
+	PaxosMemberCount = (parseStrConf("PAXOS_MEMBER_COUNT"))
+	PaxosMyID = (parseStrConf("PAXOS_MY_ID"))
+	PaxosMaxReqPerRound = int(parseStrConf("PAXOS_MAX_REQ_PER_ROUND", 64))
+	PaxosListenAddress = os.Getenv("PAXOS_LISTEN_ADDRESS")
+	if len(PaxosListenAddress) == 0 {
+		util.SlogPanic("PAXOS_LISTEN_ADDRESS not set")
 	}
-	PaxosStartingPort = uint16(startingPort)
-	myIDStr := os.Getenv("PAXOS_MY_ID")
-	paxosMyID, err := strconv.ParseUint(myIDStr, 10, 16)
-	if err != nil {
-		log.Panicln("PAXOS_MY_ID not set/invalid")
-	}
-	PaxosMyID = uint16(paxosMyID)
 }

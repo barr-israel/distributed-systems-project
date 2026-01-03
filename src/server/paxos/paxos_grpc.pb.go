@@ -20,10 +20,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Paxos_Prepare_FullMethodName       = "/Paxos/Prepare"
-	Paxos_Accept_FullMethodName        = "/Paxos/Accept"
-	Paxos_Accepted_FullMethodName      = "/Paxos/Accepted"
-	Paxos_InitiateRound_FullMethodName = "/Paxos/InitiateRound"
+	Paxos_Prepare_FullMethodName        = "/Paxos/Prepare"
+	Paxos_Accept_FullMethodName         = "/Paxos/Accept"
+	Paxos_Accepted_FullMethodName       = "/Paxos/Accepted"
+	Paxos_InitiateRound_FullMethodName  = "/Paxos/InitiateRound"
+	Paxos_ReadFromLeader_FullMethodName = "/Paxos/ReadFromLeader"
 )
 
 // PaxosClient is the client API for Paxos service.
@@ -34,6 +35,7 @@ type PaxosClient interface {
 	Accept(ctx context.Context, in *AcceptMessage, opts ...grpc.CallOption) (*AcceptResponse, error)
 	Accepted(ctx context.Context, in *AcceptedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateRound(ctx context.Context, in *InitiatiationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ReadFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadReply, error)
 }
 
 type paxosClient struct {
@@ -84,6 +86,16 @@ func (c *paxosClient) InitiateRound(ctx context.Context, in *InitiatiationReques
 	return out, nil
 }
 
+func (c *paxosClient) ReadFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadReply)
+	err := c.cc.Invoke(ctx, Paxos_ReadFromLeader_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PaxosServer is the server API for Paxos service.
 // All implementations must embed UnimplementedPaxosServer
 // for forward compatibility.
@@ -92,6 +104,7 @@ type PaxosServer interface {
 	Accept(context.Context, *AcceptMessage) (*AcceptResponse, error)
 	Accepted(context.Context, *AcceptedMessage) (*emptypb.Empty, error)
 	InitiateRound(context.Context, *InitiatiationRequest) (*emptypb.Empty, error)
+	ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error)
 	mustEmbedUnimplementedPaxosServer()
 }
 
@@ -113,6 +126,9 @@ func (UnimplementedPaxosServer) Accepted(context.Context, *AcceptedMessage) (*em
 }
 func (UnimplementedPaxosServer) InitiateRound(context.Context, *InitiatiationRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method InitiateRound not implemented")
+}
+func (UnimplementedPaxosServer) ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadFromLeader not implemented")
 }
 func (UnimplementedPaxosServer) mustEmbedUnimplementedPaxosServer() {}
 func (UnimplementedPaxosServer) testEmbeddedByValue()               {}
@@ -207,6 +223,24 @@ func _Paxos_InitiateRound_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Paxos_ReadFromLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadRequestMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).ReadFromLeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_ReadFromLeader_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).ReadFromLeader(ctx, req.(*ReadRequestMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Paxos_ServiceDesc is the grpc.ServiceDesc for Paxos service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -229,6 +263,10 @@ var Paxos_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InitiateRound",
 			Handler:    _Paxos_InitiateRound_Handler,
+		},
+		{
+			MethodName: "ReadFromLeader",
+			Handler:    _Paxos_ReadFromLeader_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
