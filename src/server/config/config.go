@@ -4,41 +4,32 @@ Package config is responsible for parsing and storing enviroment variable derive
 package config
 
 import (
-	"log/slog"
-	"os"
+	"flag"
 	"strconv"
+	"time"
 
 	"server/util"
 )
 
 var (
-	PaxosMemberCount    uint64 = 0
-	PaxosMyID           uint64 = 0
-	PaxosMaxReqPerRound int    = 0
-	PaxosListenAddress  string = ""
+	PaxosMyID             uint64        = 0
+	PaxosMemberCount      uint64        = 0
+	PaxosMaxReqPerRound   uint64        = 0
+	PaxosCleanupThreshold uint64        = 0
+	PaxosRetry            time.Duration = time.Duration(0)
+	PaxosMyIDStr          string        = ""
+	PaxosListenAddress    string        = ""
+	HTTPListenAddress     string        = ""
+	Verbose               bool          = false
 )
 
-func parseStrConf(name string, defaultValue ...uint64) uint64 {
-	value := os.Getenv(name)
-	parsed, err := strconv.ParseUint(value, 10, 64)
-	if err != nil {
-		if len(defaultValue) == 0 {
-			slog.Error("config value not set/invalid:", slog.String("name", name))
-			panic("config value not set/invalid: " + name)
-		} else {
-			slog.Warn("config value not set/invalid:", slog.String("name", name), slog.Uint64("default value", defaultValue[0]))
-		}
-		parsed = defaultValue[0]
-	}
-	return parsed
-}
-
 func SetupConf() {
-	PaxosMemberCount = (parseStrConf("PAXOS_MEMBER_COUNT"))
-	PaxosMyID = (parseStrConf("PAXOS_MY_ID"))
-	PaxosMaxReqPerRound = int(parseStrConf("PAXOS_MAX_REQ_PER_ROUND", 64))
-	PaxosListenAddress = os.Getenv("PAXOS_LISTEN_ADDRESS")
-	if len(PaxosListenAddress) == 0 {
-		util.SlogPanic("PAXOS_LISTEN_ADDRESS not set")
+	paxosID := flag.Int("id", -1, "paxos ID for this server, must be unique across the cluster")
+	flag.BoolVar(&Verbose, "v", false, "verbose output, activates debug level logging")
+	flag.Parse()
+	if *paxosID < 0 {
+		util.SlogPanic("a non-negative --id <paxos id> is required")
 	}
+	PaxosMyID = uint64(*paxosID)
+	PaxosMyIDStr = strconv.FormatUint(PaxosMyID, 10)
 }

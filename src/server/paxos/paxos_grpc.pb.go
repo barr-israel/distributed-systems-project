@@ -20,11 +20,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Paxos_Prepare_FullMethodName        = "/Paxos/Prepare"
-	Paxos_Accept_FullMethodName         = "/Paxos/Accept"
-	Paxos_Accepted_FullMethodName       = "/Paxos/Accepted"
-	Paxos_InitiateRound_FullMethodName  = "/Paxos/InitiateRound"
-	Paxos_ReadFromLeader_FullMethodName = "/Paxos/ReadFromLeader"
+	Paxos_Prepare_FullMethodName            = "/Paxos/Prepare"
+	Paxos_Accept_FullMethodName             = "/Paxos/Accept"
+	Paxos_Accepted_FullMethodName           = "/Paxos/Accepted"
+	Paxos_InitiateRound_FullMethodName      = "/Paxos/InitiateRound"
+	Paxos_ReadFromLeader_FullMethodName     = "/Paxos/ReadFromLeader"
+	Paxos_SuggestPromoteSelf_FullMethodName = "/Paxos/SuggestPromoteSelf"
+	Paxos_RequestState_FullMethodName       = "/Paxos/RequestState"
+	Paxos_GetCommitedPaxosID_FullMethodName = "/Paxos/GetCommitedPaxosID"
 )
 
 // PaxosClient is the client API for Paxos service.
@@ -36,6 +39,9 @@ type PaxosClient interface {
 	Accepted(ctx context.Context, in *AcceptedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	InitiateRound(ctx context.Context, in *InitiatiationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ReadFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadReply, error)
+	SuggestPromoteSelf(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PromotionReply, error)
+	RequestState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*State, error)
+	GetCommitedPaxosID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CommitedPaxosID, error)
 }
 
 type paxosClient struct {
@@ -96,6 +102,36 @@ func (c *paxosClient) ReadFromLeader(ctx context.Context, in *ReadRequestMessage
 	return out, nil
 }
 
+func (c *paxosClient) SuggestPromoteSelf(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PromotionReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PromotionReply)
+	err := c.cc.Invoke(ctx, Paxos_SuggestPromoteSelf_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paxosClient) RequestState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*State, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(State)
+	err := c.cc.Invoke(ctx, Paxos_RequestState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *paxosClient) GetCommitedPaxosID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CommitedPaxosID, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitedPaxosID)
+	err := c.cc.Invoke(ctx, Paxos_GetCommitedPaxosID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PaxosServer is the server API for Paxos service.
 // All implementations must embed UnimplementedPaxosServer
 // for forward compatibility.
@@ -105,6 +141,9 @@ type PaxosServer interface {
 	Accepted(context.Context, *AcceptedMessage) (*emptypb.Empty, error)
 	InitiateRound(context.Context, *InitiatiationRequest) (*emptypb.Empty, error)
 	ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error)
+	SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error)
+	RequestState(context.Context, *emptypb.Empty) (*State, error)
+	GetCommitedPaxosID(context.Context, *emptypb.Empty) (*CommitedPaxosID, error)
 	mustEmbedUnimplementedPaxosServer()
 }
 
@@ -129,6 +168,15 @@ func (UnimplementedPaxosServer) InitiateRound(context.Context, *InitiatiationReq
 }
 func (UnimplementedPaxosServer) ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadFromLeader not implemented")
+}
+func (UnimplementedPaxosServer) SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuggestPromoteSelf not implemented")
+}
+func (UnimplementedPaxosServer) RequestState(context.Context, *emptypb.Empty) (*State, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestState not implemented")
+}
+func (UnimplementedPaxosServer) GetCommitedPaxosID(context.Context, *emptypb.Empty) (*CommitedPaxosID, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCommitedPaxosID not implemented")
 }
 func (UnimplementedPaxosServer) mustEmbedUnimplementedPaxosServer() {}
 func (UnimplementedPaxosServer) testEmbeddedByValue()               {}
@@ -241,6 +289,60 @@ func _Paxos_ReadFromLeader_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Paxos_SuggestPromoteSelf_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).SuggestPromoteSelf(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_SuggestPromoteSelf_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).SuggestPromoteSelf(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Paxos_RequestState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).RequestState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_RequestState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).RequestState(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Paxos_GetCommitedPaxosID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).GetCommitedPaxosID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_GetCommitedPaxosID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).GetCommitedPaxosID(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Paxos_ServiceDesc is the grpc.ServiceDesc for Paxos service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -267,6 +369,18 @@ var Paxos_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReadFromLeader",
 			Handler:    _Paxos_ReadFromLeader_Handler,
+		},
+		{
+			MethodName: "SuggestPromoteSelf",
+			Handler:    _Paxos_SuggestPromoteSelf_Handler,
+		},
+		{
+			MethodName: "RequestState",
+			Handler:    _Paxos_RequestState_Handler,
+		},
+		{
+			MethodName: "GetCommitedPaxosID",
+			Handler:    _Paxos_GetCommitedPaxosID_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

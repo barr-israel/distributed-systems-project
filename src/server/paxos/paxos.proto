@@ -51,10 +51,28 @@ message AcceptedMessage{
   Proposal proposal = 3;
 }
 
+message PromotionReply{
+  uint64 leader = 1;
+}
+
+message State{
+  uint64 commited_paxos_id = 1;
+  uint64 min_paxos_id = 2;
+  uint64 max_paxos_id = 3;
+  Proposal data_state = 4;
+}
+
+message CommitedPaxosID{
+  uint64 commited_paxos_id = 1;
+}
+
 service Paxos{
   rpc Prepare(PrepareMessage) returns (PromiseMessage) {}
   rpc Accept(AcceptMessage) returns (AcceptResponse){}
   rpc Accepted(AcceptedMessage) returns (google.protobuf.Empty){}
   rpc InitiateRound(InitiatiationRequest) returns (google.protobuf.Empty){}
   rpc ReadFromLeader(ReadRequestMessage) returns (ReadReply){}
+  rpc SuggestPromoteSelf(google.protobuf.Empty) returns (PromotionReply){}
+  rpc RequestState(google.protobuf.Empty) returns (State){}
+  rpc GetCommitedPaxosID(google.protobuf.Empty) returns (CommitedPaxosID){}
 }
