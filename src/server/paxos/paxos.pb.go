@@ -26,6 +26,7 @@ type Action struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Value         *string                `protobuf:"bytes,2,opt,name=value,proto3,oneof" json:"value,omitempty"`
+	Revision      *uint64                `protobuf:"varint,3,opt,name=revision,proto3,oneof" json:"revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -72,6 +73,13 @@ func (x *Action) GetValue() string {
 		return *x.Value
 	}
 	return ""
+}
+
+func (x *Action) GetRevision() uint64 {
+	if x != nil && x.Revision != nil {
+		return *x.Revision
+	}
+	return 0
 }
 
 type Proposal struct {
@@ -209,6 +217,7 @@ func (x *ReadRequestMessage) GetKey() string {
 type ReadReply struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Value         *string                `protobuf:"bytes,1,opt,name=value,proto3,oneof" json:"value,omitempty"`
+	Revision      *uint64                `protobuf:"varint,2,opt,name=revision,proto3,oneof" json:"revision,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -248,6 +257,13 @@ func (x *ReadReply) GetValue() string {
 		return *x.Value
 	}
 	return ""
+}
+
+func (x *ReadReply) GetRevision() uint64 {
+	if x != nil && x.Revision != nil {
+		return *x.Revision
+	}
+	return 0
 }
 
 type PrepareMessage struct {
@@ -683,24 +699,72 @@ func (x *CommitedPaxosID) GetCommitedPaxosId() uint64 {
 	return 0
 }
 
+type KeyList struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Keys          []string               `protobuf:"bytes,1,rep,name=keys,proto3" json:"keys,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeyList) Reset() {
+	*x = KeyList{}
+	mi := &file_paxos_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeyList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeyList) ProtoMessage() {}
+
+func (x *KeyList) ProtoReflect() protoreflect.Message {
+	mi := &file_paxos_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeyList.ProtoReflect.Descriptor instead.
+func (*KeyList) Descriptor() ([]byte, []int) {
+	return file_paxos_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *KeyList) GetKeys() []string {
+	if x != nil {
+		return x.Keys
+	}
+	return nil
+}
+
 var File_paxos_proto protoreflect.FileDescriptor
 
 const file_paxos_proto_rawDesc = "" +
 	"\n" +
-	"\vpaxos.proto\x1a\x1bgoogle/protobuf/empty.proto\"?\n" +
+	"\vpaxos.proto\x1a\x1bgoogle/protobuf/empty.proto\"m\n" +
 	"\x06Action\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x19\n" +
-	"\x05value\x18\x02 \x01(\tH\x00R\x05value\x88\x01\x01B\b\n" +
-	"\x06_value\"-\n" +
+	"\x05value\x18\x02 \x01(\tH\x00R\x05value\x88\x01\x01\x12\x1f\n" +
+	"\brevision\x18\x03 \x01(\x04H\x01R\brevision\x88\x01\x01B\b\n" +
+	"\x06_valueB\v\n" +
+	"\t_revision\"-\n" +
 	"\bProposal\x12!\n" +
 	"\aactions\x18\x01 \x03(\v2\a.ActionR\aactions\":\n" +
 	"\x14InitiatiationRequest\x12\"\n" +
 	"\rnext_paxos_id\x18\x01 \x01(\x04R\vnextPaxosId\"&\n" +
 	"\x12ReadRequestMessage\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\"0\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\"^\n" +
 	"\tReadReply\x12\x19\n" +
-	"\x05value\x18\x01 \x01(\tH\x00R\x05value\x88\x01\x01B\b\n" +
-	"\x06_value\"A\n" +
+	"\x05value\x18\x01 \x01(\tH\x00R\x05value\x88\x01\x01\x12\x1f\n" +
+	"\brevision\x18\x02 \x01(\x04H\x01R\brevision\x88\x01\x01B\b\n" +
+	"\x06_valueB\v\n" +
+	"\t_revision\"A\n" +
 	"\x0ePrepareMessage\x12\x19\n" +
 	"\bpaxos_id\x18\x01 \x01(\x04R\apaxosId\x12\x14\n" +
 	"\x05round\x18\x02 \x01(\x04R\x05round\"\x83\x01\n" +
@@ -730,14 +794,17 @@ const file_paxos_proto_rawDesc = "" +
 	"\n" +
 	"data_state\x18\x04 \x01(\v2\t.ProposalR\tdataState\"=\n" +
 	"\x0fCommitedPaxosID\x12*\n" +
-	"\x11commited_paxos_id\x18\x01 \x01(\x04R\x0fcommitedPaxosId2\xc7\x03\n" +
+	"\x11commited_paxos_id\x18\x01 \x01(\x04R\x0fcommitedPaxosId\"\x1d\n" +
+	"\aKeyList\x12\x12\n" +
+	"\x04keys\x18\x01 \x03(\tR\x04keys2\x81\x04\n" +
 	"\x05Paxos\x12-\n" +
 	"\aPrepare\x12\x0f.PrepareMessage\x1a\x0f.PromiseMessage\"\x00\x12+\n" +
 	"\x06Accept\x12\x0e.AcceptMessage\x1a\x0f.AcceptResponse\"\x00\x126\n" +
 	"\bAccepted\x12\x10.AcceptedMessage\x1a\x16.google.protobuf.Empty\"\x00\x12@\n" +
 	"\rInitiateRound\x12\x15.InitiatiationRequest\x1a\x16.google.protobuf.Empty\"\x00\x123\n" +
 	"\x0eReadFromLeader\x12\x13.ReadRequestMessage\x1a\n" +
-	".ReadReply\"\x00\x12?\n" +
+	".ReadReply\"\x00\x128\n" +
+	"\x12ReadListFromLeader\x12\x16.google.protobuf.Empty\x1a\b.KeyList\"\x00\x12?\n" +
 	"\x12SuggestPromoteSelf\x12\x16.google.protobuf.Empty\x1a\x0f.PromotionReply\"\x00\x120\n" +
 	"\fRequestState\x12\x16.google.protobuf.Empty\x1a\x06.State\"\x00\x12@\n" +
 	"\x12GetCommitedPaxosID\x12\x16.google.protobuf.Empty\x1a\x10.CommitedPaxosID\"\x00B\tZ\a./paxosb\x06proto3"
@@ -754,7 +821,7 @@ func file_paxos_proto_rawDescGZIP() []byte {
 	return file_paxos_proto_rawDescData
 }
 
-var file_paxos_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_paxos_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_paxos_proto_goTypes = []any{
 	(*Action)(nil),               // 0: Action
 	(*Proposal)(nil),             // 1: Proposal
@@ -769,7 +836,8 @@ var file_paxos_proto_goTypes = []any{
 	(*PromotionReply)(nil),       // 10: PromotionReply
 	(*State)(nil),                // 11: State
 	(*CommitedPaxosID)(nil),      // 12: CommitedPaxosID
-	(*emptypb.Empty)(nil),        // 13: google.protobuf.Empty
+	(*KeyList)(nil),              // 13: KeyList
+	(*emptypb.Empty)(nil),        // 14: google.protobuf.Empty
 }
 var file_paxos_proto_depIdxs = []int32{
 	0,  // 0: Proposal.actions:type_name -> Action
@@ -782,19 +850,21 @@ var file_paxos_proto_depIdxs = []int32{
 	9,  // 7: Paxos.Accepted:input_type -> AcceptedMessage
 	2,  // 8: Paxos.InitiateRound:input_type -> InitiatiationRequest
 	3,  // 9: Paxos.ReadFromLeader:input_type -> ReadRequestMessage
-	13, // 10: Paxos.SuggestPromoteSelf:input_type -> google.protobuf.Empty
-	13, // 11: Paxos.RequestState:input_type -> google.protobuf.Empty
-	13, // 12: Paxos.GetCommitedPaxosID:input_type -> google.protobuf.Empty
-	6,  // 13: Paxos.Prepare:output_type -> PromiseMessage
-	8,  // 14: Paxos.Accept:output_type -> AcceptResponse
-	13, // 15: Paxos.Accepted:output_type -> google.protobuf.Empty
-	13, // 16: Paxos.InitiateRound:output_type -> google.protobuf.Empty
-	4,  // 17: Paxos.ReadFromLeader:output_type -> ReadReply
-	10, // 18: Paxos.SuggestPromoteSelf:output_type -> PromotionReply
-	11, // 19: Paxos.RequestState:output_type -> State
-	12, // 20: Paxos.GetCommitedPaxosID:output_type -> CommitedPaxosID
-	13, // [13:21] is the sub-list for method output_type
-	5,  // [5:13] is the sub-list for method input_type
+	14, // 10: Paxos.ReadListFromLeader:input_type -> google.protobuf.Empty
+	14, // 11: Paxos.SuggestPromoteSelf:input_type -> google.protobuf.Empty
+	14, // 12: Paxos.RequestState:input_type -> google.protobuf.Empty
+	14, // 13: Paxos.GetCommitedPaxosID:input_type -> google.protobuf.Empty
+	6,  // 14: Paxos.Prepare:output_type -> PromiseMessage
+	8,  // 15: Paxos.Accept:output_type -> AcceptResponse
+	14, // 16: Paxos.Accepted:output_type -> google.protobuf.Empty
+	14, // 17: Paxos.InitiateRound:output_type -> google.protobuf.Empty
+	4,  // 18: Paxos.ReadFromLeader:output_type -> ReadReply
+	13, // 19: Paxos.ReadListFromLeader:output_type -> KeyList
+	10, // 20: Paxos.SuggestPromoteSelf:output_type -> PromotionReply
+	11, // 21: Paxos.RequestState:output_type -> State
+	12, // 22: Paxos.GetCommitedPaxosID:output_type -> CommitedPaxosID
+	14, // [14:23] is the sub-list for method output_type
+	5,  // [5:14] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
 	5,  // [5:5] is the sub-list for extension extendee
 	0,  // [0:5] is the sub-list for field type_name
@@ -814,7 +884,7 @@ func file_paxos_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_paxos_proto_rawDesc), len(file_paxos_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

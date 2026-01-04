@@ -5,6 +5,7 @@ option go_package = "./paxos";
 message Action{
   string key = 1;
   optional string value = 2;
+  optional uint64 revision = 3;
 }
 
 message Proposal{
@@ -21,6 +22,7 @@ message ReadRequestMessage{
 
 message ReadReply{
   optional string value = 1;
+  optional uint64 revision = 2;
 }
 
 message PrepareMessage{
@@ -66,12 +68,17 @@ message CommitedPaxosID{
   uint64 commited_paxos_id = 1;
 }
 
+message KeyList{
+  repeated string keys = 1;
+}
+
 service Paxos{
   rpc Prepare(PrepareMessage) returns (PromiseMessage) {}
   rpc Accept(AcceptMessage) returns (AcceptResponse){}
   rpc Accepted(AcceptedMessage) returns (google.protobuf.Empty){}
   rpc InitiateRound(InitiatiationRequest) returns (google.protobuf.Empty){}
   rpc ReadFromLeader(ReadRequestMessage) returns (ReadReply){}
+  rpc ReadListFromLeader(google.protobuf.Empty) returns (KeyList){}
   rpc SuggestPromoteSelf(google.protobuf.Empty) returns (PromotionReply){}
   rpc RequestState(google.protobuf.Empty) returns (State){}
   rpc GetCommitedPaxosID(google.protobuf.Empty) returns (CommitedPaxosID){}

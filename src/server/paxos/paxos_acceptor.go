@@ -5,8 +5,9 @@ import (
 )
 
 type ActionLocal struct {
-	key   string
-	value *string
+	key      string
+	value    *string
+	revision *uint64
 }
 
 func toActionLocalArray(as []*Action) []ActionLocal {
@@ -35,15 +36,15 @@ func toActionArray(as []ActionLocal) []*Action {
 }
 
 func (a *Action) toActionLocal() ActionLocal {
-	return ActionLocal{key: a.Key, value: a.Value}
+	return ActionLocal{key: a.Key, value: a.Value, revision: a.Revision}
 }
 
 func (a *ActionLocal) toAction() Action {
-	return Action{Key: a.key, Value: a.value}
+	return Action{Key: a.key, Value: a.value, Revision: a.revision}
 }
 
 func (req *PaxosLocalRequest) toActionLocal() ActionLocal {
-	return ActionLocal{key: req.key, value: req.value}
+	return ActionLocal{key: req.key, value: req.value, revision: req.revision}
 }
 
 type PaxosInstance struct {

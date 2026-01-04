@@ -156,27 +156,51 @@ func (server *PaxosServerState) cleanUpOldPaxos() {
 func (server *PaxosServerState) commitActions(actionLocal []ActionLocal) {
 	activeRequestsCount := len(server.activeWrites)
 	for _, action := range actionLocal {
-		if action.value != nil {
-			server.data[action.key] = action.value
-		} else {
-			delete(server.data, action.key)
-		}
-		for i := 0; i < len(server.activeWrites); i++ {
-			for i := 0; i < activeRequestsCount; i++ {
-				request := server.activeWrites[i]
-				// checking just the key is sufficient because any group of writes can be commited by commiting one of them and pretending the rest were commited just before it
-				if action.key == request.key {
-					if action.value != nil {
-						slog.Info("Commited write", slog.String("key", action.key), slog.String("value", *action.value))
-					} else {
-						slog.Info("Commited delete", slog.String("key", action.key))
-					}
-					// request fulfilled, notify requster
-					close(request.replyChannel)
-					// remove request from active requests
-					server.activeWrites[i] = server.activeWrites[activeRequestsCount-1]
-					activeRequestsCount--
+		entry, exists := server.data[action.key]
+		if action.revision == nil {
+			// no revision check requested, update or delete normally
+			if action.value != nil {
+				revision := uint64(1)
+				if exists {
+					revision = entry.Revision + uint64(1)
 				}
+				server.data[action.key] = &DataEntry{Value: action.value, Revision: revision}
+			} else {
+				delete(server.data, action.key)
+			}
+		} else if exists && *action.revision == entry.Revision {
+			// revision check requested, so the entry must exist with the given revision
+			if action.value != nil {
+				server.data[action.key] = &DataEntry{Value: action.value, Revision: entry.Revision + 1}
+			} else {
+				delete(server.data, action.key)
+			}
+		} else if *action.revision == 0 {
+			// revision specifically requested to write if doesnt exist
+			if action.value != nil {
+				server.data[action.key] = &DataEntry{Value: action.value, Revision: 1}
+			}
+		}
+		for i := 0; i < activeRequestsCount; i++ {
+			request := server.activeWrites[i]
+			// checking just the key is sufficient because any group of writes can be commited by commiting one of them and pretending the rest were commited just before it
+			// however, when revision dependant updates are involved, we can only do this if the request is already stale
+			if action.key == request.key && (request.revision == nil || action.revision == nil || *request.revision <= *action.revision) {
+				if action.value != nil {
+					entry, contains := server.data[request.key]
+					if contains {
+						request.replyChannel <- entry.Revision
+					} else {
+						request.replyChannel <- 0
+					}
+					slog.Info("Commited write", slog.String("key", action.key), slog.String("value", *action.value))
+				} else {
+					slog.Info("Commited delete", slog.String("key", action.key))
+				}
+				close(request.replyChannel)
+				// remove request from active requests
+				server.activeWrites[i] = server.activeWrites[activeRequestsCount-1]
+				activeRequestsCount--
 			}
 		}
 	}

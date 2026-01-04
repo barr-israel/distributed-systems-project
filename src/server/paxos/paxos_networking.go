@@ -19,7 +19,13 @@ import (
 type PaxosLocalRequest struct {
 	key          string
 	value        *string
-	replyChannel chan<- struct{}
+	revision     *uint64
+	replyChannel chan<- uint64
+}
+
+type DataEntry struct {
+	Value    *string
+	Revision uint64
 }
 
 type PaxosServerState struct {
@@ -29,7 +35,7 @@ type PaxosServerState struct {
 	leader           uint64
 	connections      []*grpc.ClientConn
 	peers            []PaxosClient
-	data             map[string]*string
+	data             map[string]*DataEntry
 	leaderLock       sync.Mutex
 	acceptorLock     sync.Mutex
 	minPaxosID       uint64
@@ -38,6 +44,16 @@ type PaxosServerState struct {
 	ongoingPaxos     map[uint64]*PaxosInstance
 	incomingRequests chan PaxosLocalRequest
 	activeWrites     []*PaxosLocalRequest
+}
+
+func (server *PaxosServerState) getKeys() []string {
+	keys := make([]string, len(server.data))
+	i := 0
+	for key := range server.data {
+		keys[i] = key
+		i++
+	}
+	return keys
 }
 
 func (server *PaxosServerState) tryRecover(ctx context.Context) {
@@ -60,7 +76,7 @@ func (server *PaxosServerState) tryRecover(ctx context.Context) {
 				slog.Warn("Failed to get state from leader", slog.Uint64("Leader ID", leader.Leader))
 			}
 			for _, action := range state.DataState.Actions {
-				server.data[action.Key] = action.Value
+				server.data[action.Key] = &DataEntry{Value: action.Value, Revision: *action.Revision}
 			}
 			server.minPaxosID = state.MinPaxosId
 			server.maxPaxosID = state.MaxPaxosId
@@ -105,7 +121,7 @@ func SetupGRPC(ctx context.Context, cli *etcd.EtcdClient) *PaxosServerState {
 		peers[peerID] = grpcClient
 	}
 	incomingRequests := make(chan PaxosLocalRequest, config.PaxosMaxReqPerRound)
-	server := &PaxosServerState{ctx: ctx, etcdClient: cli, connections: connections, peers: peers, incomingRequests: incomingRequests, ongoingPaxos: make(map[uint64]*PaxosInstance), data: make(map[string]*string)}
+	server := &PaxosServerState{ctx: ctx, etcdClient: cli, connections: connections, peers: peers, incomingRequests: incomingRequests, ongoingPaxos: make(map[uint64]*PaxosInstance), data: make(map[string]*DataEntry)}
 	server.tryRecover(ctx)
 	cli.PublishReady()
 	cli.WaitForEnoughReady()

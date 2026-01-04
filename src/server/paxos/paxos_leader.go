@@ -122,7 +122,23 @@ func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadReque
 	}
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
-	return &ReadReply{Value: server.data[msg.Key]}, nil
+	entry := server.data[msg.Key]
+	if entry != nil {
+		return &ReadReply{Value: entry.Value, Revision: &entry.Revision}, nil
+	} else {
+		return &ReadReply{Value: nil, Revision: nil}, nil
+	}
+}
+
+func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *emptypb.Empty) (*KeyList, error) {
+	server.leaderLock.Lock()
+	defer server.leaderLock.Unlock()
+	if server.leader != config.PaxosMyID {
+		return nil, errors.New("server is not the leader")
+	}
+	server.acceptorLock.Lock()
+	defer server.acceptorLock.Unlock()
+	return &KeyList{Keys: server.getKeys()}, nil
 }
 
 func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty) (*State, error) {
@@ -134,8 +150,8 @@ func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	dataState := make([]*Action, len(server.data))
-	for key, value := range server.data {
-		dataState = append(dataState, &Action{Key: key, Value: value})
+	for key, entry := range server.data {
+		dataState = append(dataState, &Action{Key: key, Value: entry.Value, Revision: &entry.Revision})
 	}
 	return &State{MinPaxosId: server.minPaxosID, MaxPaxosId: server.maxPaxosID, CommitedPaxosId: server.commitedPaxosID, DataState: &Proposal{Actions: dataState}}, nil
 }
