@@ -73,8 +73,13 @@ message CommitedPaxosID{
   uint64 commited_paxos_id = 1;
 }
 
-message KeyList{
-  repeated string keys = 1;
+message KeyRev{
+  string key = 1;
+  uint64 revision = 2;
+}
+
+message KeyRevsList{
+  repeated KeyRev keyrevs = 1;
 }
 
 message ListRequest{
@@ -88,7 +93,7 @@ service Paxos{
   rpc WriteToLeader(Action) returns (WriteReply){}
   rpc ReadFromLeader(ReadRequestMessage) returns (ReadReply){}
   rpc ReadRevisionFromLeader(ReadRequestMessage) returns (ReadRevisionReply){}
-  rpc ReadListFromLeader(ListRequest) returns (KeyList){}
+  rpc ReadListFromLeader(ListRequest) returns (KeyRevsList){}
   rpc SuggestPromoteSelf(google.protobuf.Empty) returns (PromotionReply){}
   rpc RequestState(google.protobuf.Empty) returns (State){}
   rpc GetCommitedPaxosID(google.protobuf.Empty) returns (CommitedPaxosID){}

@@ -199,7 +199,7 @@ func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadReque
 	}
 }
 
-func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListRequest) (*KeyList, error) {
+func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListRequest) (*KeyRevsList, error) {
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
 	if server.leader != config.PaxosMyID {
@@ -207,7 +207,7 @@ func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListR
 	}
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
-	return &KeyList{Keys: server.getKeys(msg.OmitDeleted)}, nil
+	return &KeyRevsList{Keyrevs: server.getKeys(msg.OmitDeleted)}, nil
 }
 
 func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty) (*State, error) {

@@ -91,6 +91,7 @@ func (server *PaxosServerState) Accept(ctx context.Context, msg *AcceptMessage) 
 }
 
 func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessage) (*emptypb.Empty, error) {
+	// TODO: add proposal fill-in
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	slog.Debug("Received accepted", slog.String("msg", msg.String()))
@@ -114,7 +115,7 @@ func (server *PaxosServerState) tryCommitPaxos() {
 	for paxos != nil && paxos.decided {
 		server.commitedPaxosID++
 		server.commitActions(*paxos.preference, server.commitedPaxosID)
-		slog.Debug("Commited paxos:", slog.Uint64("paxosID", server.commitedPaxosID), slog.Any("actions", paxos.proposals))
+		slog.Info("Commited paxos:", slog.Uint64("paxosID", server.commitedPaxosID), slog.Any("actions", paxos.proposals))
 		if paxos.done {
 			server.deletePaxos(server.commitedPaxosID)
 		}
@@ -147,8 +148,9 @@ func (server *PaxosServerState) commitActions(actionLocal []ActionLocal, paxosID
 	activeRequestsCount := len(server.activeWrites)
 	for _, action := range actionLocal {
 		entry, exists := server.data[action.key]
+		slog.Debug("Commiting action with", slog.String("key", action.key))
 		success := false
-		// an action will be commited in 1 of 3 cases:
+		// an action will applied into the database in 1 of 3 cases:
 		// 1. the action did not request a revision check
 		// 2. the action requested a revision check and it passes
 		// 3. the action requested a revision check of 0, which means "only if doesnt exist" and the key doesnt exist

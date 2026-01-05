@@ -8,7 +8,12 @@ import (
 func (server *PaxosServerState) ReadRevision(ctx context.Context, key string) uint64 {
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
-	return server.data[key].Revision
+	entry, contains := server.data[key]
+	if contains {
+		return entry.Revision
+	} else {
+		return 0
+	}
 }
 
 func (server *PaxosServerState) LinearizedReadRevision(ctx context.Context, key string) uint64 {
@@ -47,16 +52,16 @@ func (server *PaxosServerState) Write(ctx context.Context, key string, value *st
 	return LocalWriteReply{Success: res.Success, Revision: res.Revision}
 }
 
-func (server *PaxosServerState) ListKeysLinearized(ctx context.Context, omitDeleted bool) []string {
+func (server *PaxosServerState) ListKeysLinearized(ctx context.Context, omitDeleted bool) []*KeyRev {
 	res, err := server.peers[server.leader].ReadListFromLeader(ctx, &ListRequest{OmitDeleted: omitDeleted})
 	for err != nil {
 		slog.Warn("Error reading from leader, retrying", slog.String("error", err.Error()))
 		server.refreshLeader(ctx)
 		res, err = server.peers[server.leader].ReadListFromLeader(ctx, &ListRequest{OmitDeleted: omitDeleted})
 	}
-	return res.Keys
+	return res.Keyrevs
 }
 
-func (server *PaxosServerState) ListKeys(ctx context.Context, omitDeleted bool) []string {
+func (server *PaxosServerState) ListKeys(ctx context.Context, omitDeleted bool) []*KeyRev {
 	return server.getKeys(omitDeleted)
 }

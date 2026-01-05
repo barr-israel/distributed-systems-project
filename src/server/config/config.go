@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	EtcdListenAddress     string        = "127.0.0.1:2379"
 	PaxosMyID             uint64        = 0
 	PaxosMemberCount      uint64        = 0
 	PaxosMaxReqPerRound   uint64        = 0

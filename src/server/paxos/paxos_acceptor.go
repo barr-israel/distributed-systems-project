@@ -18,14 +18,6 @@ func toActionLocalArray(as *[]*Action) *[]ActionLocal {
 	return &actions
 }
 
-func reqsToActionLocalArray(reqs *[]*LocalWriteRequest) *[]ActionLocal {
-	actions := make([]ActionLocal, len(*reqs))
-	for i, a := range *reqs {
-		actions[i] = a.toActionLocal()
-	}
-	return &actions
-}
-
 func toActionArray(as *[]ActionLocal) []*Action {
 	actions := make([]*Action, len(*as))
 	for i, a := range *as {
@@ -50,10 +42,6 @@ func (a *Action) toActionLocal() ActionLocal {
 
 func (a *ActionLocal) toAction() Action {
 	return Action{Key: a.key, Value: a.value, Revision: a.revision}
-}
-
-func (req *LocalWriteRequest) toActionLocal() ActionLocal {
-	return ActionLocal{key: req.key, value: req.value, revision: req.revision}
 }
 
 func (req *LocalWriteRequest) toAction() Action {
@@ -116,9 +104,6 @@ func (p *PaxosInstance) Accept(msg *AcceptMessage) (*AcceptedMessage, bool) {
 }
 
 func (p *PaxosInstance) Accepted(msg *AcceptedMessage) bool {
-	if msg.Round < p.lastGoodRound {
-		return false
-	}
 	p.extendBuffersTo(int(msg.Round) + 1)
 	p.acceptedReceived[msg.Round]++
 	pastThreshold := p.acceptedReceived[msg.Round] > config.PaxosMemberCount/2

@@ -127,7 +127,7 @@ func keepAlive(ctx context.Context, cli *clientv3.Client, leaseID clientv3.Lease
 
 func EtcdSetup() EtcdClient {
 	slog.Info("Starting etcd client")
-	cli, err := clientv3.NewFromURL("127.0.0.1:2379")
+	cli, err := clientv3.NewFromURL(config.EtcdListenAddress)
 	if err != nil {
 		util.SlogPanic("Failed to connect to etcd")
 	}

@@ -42,7 +42,7 @@ type PaxosClient interface {
 	WriteToLeader(ctx context.Context, in *Action, opts ...grpc.CallOption) (*WriteReply, error)
 	ReadFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadReply, error)
 	ReadRevisionFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadRevisionReply, error)
-	ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyList, error)
+	ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyRevsList, error)
 	SuggestPromoteSelf(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PromotionReply, error)
 	RequestState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*State, error)
 	GetCommitedPaxosID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CommitedPaxosID, error)
@@ -116,9 +116,9 @@ func (c *paxosClient) ReadRevisionFromLeader(ctx context.Context, in *ReadReques
 	return out, nil
 }
 
-func (c *paxosClient) ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyList, error) {
+func (c *paxosClient) ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyRevsList, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(KeyList)
+	out := new(KeyRevsList)
 	err := c.cc.Invoke(ctx, Paxos_ReadListFromLeader_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ type PaxosServer interface {
 	WriteToLeader(context.Context, *Action) (*WriteReply, error)
 	ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error)
 	ReadRevisionFromLeader(context.Context, *ReadRequestMessage) (*ReadRevisionReply, error)
-	ReadListFromLeader(context.Context, *ListRequest) (*KeyList, error)
+	ReadListFromLeader(context.Context, *ListRequest) (*KeyRevsList, error)
 	SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error)
 	RequestState(context.Context, *emptypb.Empty) (*State, error)
 	GetCommitedPaxosID(context.Context, *emptypb.Empty) (*CommitedPaxosID, error)
@@ -198,7 +198,7 @@ func (UnimplementedPaxosServer) ReadFromLeader(context.Context, *ReadRequestMess
 func (UnimplementedPaxosServer) ReadRevisionFromLeader(context.Context, *ReadRequestMessage) (*ReadRevisionReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadRevisionFromLeader not implemented")
 }
-func (UnimplementedPaxosServer) ReadListFromLeader(context.Context, *ListRequest) (*KeyList, error) {
+func (UnimplementedPaxosServer) ReadListFromLeader(context.Context, *ListRequest) (*KeyRevsList, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadListFromLeader not implemented")
 }
 func (UnimplementedPaxosServer) SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error) {

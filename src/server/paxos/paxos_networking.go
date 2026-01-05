@@ -53,17 +53,16 @@ type PaxosServerState struct {
 	activeWrites     []*LocalWriteRequest
 }
 
-func (server *PaxosServerState) getKeys(omitDeleted bool) []string {
-	slog.Debug("getting key list", slog.Bool("omit", omitDeleted))
-	keys := make([]string, len(server.data))
+func (server *PaxosServerState) getKeys(omitDeleted bool) []*KeyRev {
+	keyrevs := make([]*KeyRev, len(server.data))
 	i := 0
 	for key, value := range server.data {
 		if !omitDeleted || value.Value != nil {
-			keys[i] = key
+			keyrevs[i] = &KeyRev{Key: key, Revision: value.Revision}
 			i++
 		}
 	}
-	return keys[:i]
+	return keyrevs[:i]
 }
 
 func (server *PaxosServerState) Recover(ctx context.Context) {
