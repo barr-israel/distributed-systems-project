@@ -20,6 +20,7 @@ var (
 	PaxosMyIDStr          string        = ""
 	PaxosListenAddress    string        = ""
 	HTTPListenAddress     string        = ""
+	EtcdLeaseTTL          int64         = 0
 	Recover               bool          = false
 	Verbose               bool          = false
 )

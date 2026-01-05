@@ -5,6 +5,22 @@ import (
 	"log/slog"
 )
 
+func (server *PaxosServerState) ReadRevision(ctx context.Context, key string) uint64 {
+	server.acceptorLock.Lock()
+	defer server.acceptorLock.Unlock()
+	return server.data[key].Revision
+}
+
+func (server *PaxosServerState) LinearizedReadRevision(ctx context.Context, key string) uint64 {
+	res, err := server.peers[server.leader].ReadRevisionFromLeader(ctx, &ReadRequestMessage{Key: key})
+	for err != nil {
+		slog.Warn("Error reading from leader, retrying", slog.String("error", err.Error()))
+		server.refreshLeader(ctx)
+		res, err = server.peers[server.leader].ReadRevisionFromLeader(ctx, &ReadRequestMessage{Key: key})
+	}
+	return res.Revision
+}
+
 func (server *PaxosServerState) Read(ctx context.Context, key string) *DataEntry {
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()

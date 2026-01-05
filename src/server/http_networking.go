@@ -74,25 +74,41 @@ func handleGet(request *http.Request, paxosServer *paxos.PaxosServerState, write
 	slog.Info("Received HTTP GET", slog.String("Headers", fmt.Sprint(request.Header)))
 	key := request.Header.Get("key")
 	_, linearized := request.Header["Linearized"]
-	var response *paxos.DataEntry
-	if linearized {
-		response = paxosServer.LinearizedRead(context.Background(), key)
-	} else {
-		response = paxosServer.Read(context.Background(), key)
-	}
-	if response != nil {
-		var err error
-		writer.Header().Set("Content-Type", "application/json")
-		if response.Value != nil {
-			_, err = fmt.Fprintf(writer, "{value:\"%s\",revision:%d}", *response.Value, response.Revision)
+	_, revisionOnly := request.Header["Revision-Only"]
+	ctx := request.Context()
+	if revisionOnly {
+		var response uint64
+		if linearized {
+			response = paxosServer.LinearizedReadRevision(ctx, key)
 		} else {
-			_, err = fmt.Fprintf(writer, "{\"value\":null,\"revision\":%d}", response.Revision)
+			response = paxosServer.ReadRevision(ctx, key)
 		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, err := fmt.Fprintf(writer, "{\"revision\":%d}", response)
 		if err != nil {
 			slog.Error("Error in HTTP GET")
 		}
 	} else {
-		writer.WriteHeader(404)
+		var response *paxos.DataEntry
+		if linearized {
+			response = paxosServer.LinearizedRead(ctx, key)
+		} else {
+			response = paxosServer.Read(ctx, key)
+		}
+		if response != nil {
+			var err error
+			writer.Header().Set("Content-Type", "application/json")
+			if response.Value != nil {
+				_, err = fmt.Fprintf(writer, "{value:\"%s\",revision:%d}", *response.Value, response.Revision)
+			} else {
+				_, err = fmt.Fprintf(writer, "{\"value\":null,\"revision\":%d}", response.Revision)
+			}
+			if err != nil {
+				slog.Error("Error in HTTP GET")
+			}
+		} else {
+			writer.WriteHeader(404)
+		}
 	}
 }
 

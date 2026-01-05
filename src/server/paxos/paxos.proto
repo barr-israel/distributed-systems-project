@@ -26,6 +26,10 @@ message ReadReply{
   uint64 revision = 2;
 }
 
+message ReadRevisionReply{
+  uint64 revision =1;
+}
+
 message PrepareMessage{
   uint64 paxos_id = 1;
   uint64 round = 2;
@@ -83,6 +87,7 @@ service Paxos{
   rpc Accepted(AcceptedMessage) returns (google.protobuf.Empty){}
   rpc WriteToLeader(Action) returns (WriteReply){}
   rpc ReadFromLeader(ReadRequestMessage) returns (ReadReply){}
+  rpc ReadRevisionFromLeader(ReadRequestMessage) returns (ReadRevisionReply){}
   rpc ReadListFromLeader(ListRequest) returns (KeyList){}
   rpc SuggestPromoteSelf(google.protobuf.Empty) returns (PromotionReply){}
   rpc RequestState(google.protobuf.Empty) returns (State){}

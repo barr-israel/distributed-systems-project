@@ -55,16 +55,16 @@ func (client *EtcdClient) WaitForEnoughReady() {
 	util.SlogPanic("Watch failed before enough peers connected")
 }
 
-func (client *EtcdClient) readString(key string) string {
-	res, err := client.client.Get(context.Background(), key)
+func readString(client *clientv3.Client, key string) string {
+	res, err := client.Get(context.Background(), key)
 	if err != nil || res.Count == 0 {
 		util.SlogPanic("Can't read from etcd", slog.String("key", key))
 	}
 	return string(res.Kvs[0].Value)
 }
 
-func (client *EtcdClient) readInt(key string) uint64 {
-	str := client.readString(key)
+func readInt(client *clientv3.Client, key string) uint64 {
+	str := readString(client, key)
 	parsed, err := strconv.ParseUint(str, 10, 64)
 	if err != nil {
 		util.SlogPanic("invalid etcd config value", slog.String("key", key))
@@ -72,13 +72,14 @@ func (client *EtcdClient) readInt(key string) uint64 {
 	return parsed
 }
 
-func (client *EtcdClient) readConfig() {
-	config.PaxosListenAddress = client.readString("paxos_listen_address/" + config.PaxosMyIDStr)
-	config.HTTPListenAddress = client.readString("http_listen_address/" + config.PaxosMyIDStr)
-	config.PaxosMemberCount = client.readInt("paxos_member_count")
-	config.PaxosMaxReqPerRound = client.readInt("paxos_max_req_per_round")
-	config.PaxosCleanupThreshold = client.readInt("paxos_cleanup_threshold")
-	config.PaxosRetry = time.Duration(int64(client.readInt("paxos_retry_milliseconds")))
+func readConfig(client *clientv3.Client) {
+	config.PaxosListenAddress = readString(client, "paxos_listen_address/"+config.PaxosMyIDStr)
+	config.HTTPListenAddress = readString(client, "http_listen_address/"+config.PaxosMyIDStr)
+	config.PaxosMemberCount = readInt(client, "paxos_member_count")
+	config.PaxosMaxReqPerRound = readInt(client, "paxos_max_req_per_round")
+	config.PaxosCleanupThreshold = readInt(client, "paxos_cleanup_threshold")
+	config.PaxosRetry = time.Duration(int64(readInt(client, "paxos_retry_milliseconds")))
+	config.EtcdLeaseTTL = int64(readInt(client, "etcd_lease_ttl_seconds"))
 }
 
 func (client *EtcdClient) PublishReady() {
@@ -114,12 +115,14 @@ func keepAlive(ctx context.Context, cli *clientv3.Client, leaseID clientv3.Lease
 		// log.Println("Alive")
 	}
 	slog.Debug("Revoking lease")
-	_, err = cli.Revoke(context.Background(), leaseID)
+	revokeCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.EtcdLeaseTTL)*time.Second)
+	_, err = cli.Revoke(revokeCtx, leaseID)
 	if err != nil {
 		slog.Error("Error revoking lease")
 	}
 	slog.Debug("Lease revoked")
 	close(doneChannel)
+	cancel()
 }
 
 func EtcdSetup() EtcdClient {
@@ -128,7 +131,8 @@ func EtcdSetup() EtcdClient {
 	if err != nil {
 		util.SlogPanic("Failed to connect to etcd")
 	}
-	lease, err := cli.Grant(context.Background(), 5)
+	readConfig(cli)
+	lease, err := cli.Grant(context.Background(), config.EtcdLeaseTTL)
 	if err != nil {
 		util.SlogPanic("Failed to grant lease")
 	}
@@ -137,7 +141,6 @@ func EtcdSetup() EtcdClient {
 	go keepAlive(kaCtx, cli, lease.ID, keepAliveDone)
 	slog.Info("etcd client connected")
 	client := EtcdClient{client: cli, leaseID: lease.ID, keepAliveCancel: kaCancel, keepAliveDone: keepAliveDone}
-	client.readConfig()
 	return client
 }
 

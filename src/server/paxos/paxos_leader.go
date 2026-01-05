@@ -167,8 +167,23 @@ func (server *PaxosServerState) WriteToLeader(_ context.Context, msg *Action) (*
 	return &WriteReply{Success: reply.Success, Revision: reply.Revision}, nil
 }
 
+func (server *PaxosServerState) ReadRevisionFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadRevisionReply, error) {
+	server.leaderLock.Lock()
+	defer server.leaderLock.Unlock()
+	if server.leader != config.PaxosMyID {
+		return nil, errors.New("server is not the leader")
+	}
+	server.acceptorLock.Lock()
+	defer server.acceptorLock.Unlock()
+	entry := server.data[msg.Key]
+	if entry != nil {
+		return &ReadRevisionReply{Revision: entry.Revision}, nil
+	} else {
+		return &ReadRevisionReply{Revision: 0}, nil
+	}
+}
+
 func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadReply, error) {
-	// TODO: do we actually need the leader lock?
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
 	if server.leader != config.PaxosMyID {
@@ -185,7 +200,6 @@ func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadReque
 }
 
 func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListRequest) (*KeyList, error) {
-	// TODO: do we actually need the leader lock?
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
 	if server.leader != config.PaxosMyID {

@@ -20,15 +20,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Paxos_Prepare_FullMethodName            = "/Paxos/Prepare"
-	Paxos_Accept_FullMethodName             = "/Paxos/Accept"
-	Paxos_Accepted_FullMethodName           = "/Paxos/Accepted"
-	Paxos_WriteToLeader_FullMethodName      = "/Paxos/WriteToLeader"
-	Paxos_ReadFromLeader_FullMethodName     = "/Paxos/ReadFromLeader"
-	Paxos_ReadListFromLeader_FullMethodName = "/Paxos/ReadListFromLeader"
-	Paxos_SuggestPromoteSelf_FullMethodName = "/Paxos/SuggestPromoteSelf"
-	Paxos_RequestState_FullMethodName       = "/Paxos/RequestState"
-	Paxos_GetCommitedPaxosID_FullMethodName = "/Paxos/GetCommitedPaxosID"
+	Paxos_Prepare_FullMethodName                = "/Paxos/Prepare"
+	Paxos_Accept_FullMethodName                 = "/Paxos/Accept"
+	Paxos_Accepted_FullMethodName               = "/Paxos/Accepted"
+	Paxos_WriteToLeader_FullMethodName          = "/Paxos/WriteToLeader"
+	Paxos_ReadFromLeader_FullMethodName         = "/Paxos/ReadFromLeader"
+	Paxos_ReadRevisionFromLeader_FullMethodName = "/Paxos/ReadRevisionFromLeader"
+	Paxos_ReadListFromLeader_FullMethodName     = "/Paxos/ReadListFromLeader"
+	Paxos_SuggestPromoteSelf_FullMethodName     = "/Paxos/SuggestPromoteSelf"
+	Paxos_RequestState_FullMethodName           = "/Paxos/RequestState"
+	Paxos_GetCommitedPaxosID_FullMethodName     = "/Paxos/GetCommitedPaxosID"
 )
 
 // PaxosClient is the client API for Paxos service.
@@ -40,6 +41,7 @@ type PaxosClient interface {
 	Accepted(ctx context.Context, in *AcceptedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	WriteToLeader(ctx context.Context, in *Action, opts ...grpc.CallOption) (*WriteReply, error)
 	ReadFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadReply, error)
+	ReadRevisionFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadRevisionReply, error)
 	ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyList, error)
 	SuggestPromoteSelf(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PromotionReply, error)
 	RequestState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*State, error)
@@ -104,6 +106,16 @@ func (c *paxosClient) ReadFromLeader(ctx context.Context, in *ReadRequestMessage
 	return out, nil
 }
 
+func (c *paxosClient) ReadRevisionFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadRevisionReply, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadRevisionReply)
+	err := c.cc.Invoke(ctx, Paxos_ReadRevisionFromLeader_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *paxosClient) ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyList, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(KeyList)
@@ -153,6 +165,7 @@ type PaxosServer interface {
 	Accepted(context.Context, *AcceptedMessage) (*emptypb.Empty, error)
 	WriteToLeader(context.Context, *Action) (*WriteReply, error)
 	ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error)
+	ReadRevisionFromLeader(context.Context, *ReadRequestMessage) (*ReadRevisionReply, error)
 	ReadListFromLeader(context.Context, *ListRequest) (*KeyList, error)
 	SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error)
 	RequestState(context.Context, *emptypb.Empty) (*State, error)
@@ -181,6 +194,9 @@ func (UnimplementedPaxosServer) WriteToLeader(context.Context, *Action) (*WriteR
 }
 func (UnimplementedPaxosServer) ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadFromLeader not implemented")
+}
+func (UnimplementedPaxosServer) ReadRevisionFromLeader(context.Context, *ReadRequestMessage) (*ReadRevisionReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadRevisionFromLeader not implemented")
 }
 func (UnimplementedPaxosServer) ReadListFromLeader(context.Context, *ListRequest) (*KeyList, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadListFromLeader not implemented")
@@ -305,6 +321,24 @@ func _Paxos_ReadFromLeader_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Paxos_ReadRevisionFromLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadRequestMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).ReadRevisionFromLeader(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_ReadRevisionFromLeader_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).ReadRevisionFromLeader(ctx, req.(*ReadRequestMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Paxos_ReadListFromLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListRequest)
 	if err := dec(in); err != nil {
@@ -403,6 +437,10 @@ var Paxos_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReadFromLeader",
 			Handler:    _Paxos_ReadFromLeader_Handler,
+		},
+		{
+			MethodName: "ReadRevisionFromLeader",
+			Handler:    _Paxos_ReadRevisionFromLeader_Handler,
 		},
 		{
 			MethodName: "ReadListFromLeader",
