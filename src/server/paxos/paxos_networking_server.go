@@ -13,19 +13,11 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-func (server *PaxosServerState) fillActiveRequests() {
-	for len(server.incomingRequests) > 0 && len(server.activeWrites) < int(config.PaxosMaxReqPerRound) {
-		req := <-server.incomingRequests
-		server.activeWrites = append(server.activeWrites, &req)
-	}
-}
-
 func (server *PaxosServerState) getOrCreatePaxosInstance(paxosID uint64) *PaxosInstance {
 	instance, contains := server.ongoingPaxos[paxosID]
 	if !contains {
 		slog.Info("Starting new paxos", slog.Uint64("Paxos ID", paxosID))
-		server.fillActiveRequests()
-		instance = NewPaxosInstance(server.activeWrites)
+		instance = NewPaxosInstance()
 		server.ongoingPaxos[paxosID] = instance
 		server.maxPaxosID = max(server.maxPaxosID, paxosID)
 	}
@@ -66,14 +58,13 @@ func (server *PaxosServerState) sendCommitedIDRequest(peerID uint64, responses c
 	responses <- res.CommitedPaxosId
 }
 
-// TODO: add leader check
-
 func (server *PaxosServerState) Prepare(ctx context.Context, msg *PrepareMessage) (*PromiseMessage, error) {
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	slog.Debug("Received prepare", slog.String("msg", msg.String()))
 	if server.minPaxosID > msg.PaxosId {
-		return nil, nil
+		// the leader will eventually realize it is an old Paxos ID
+		return &PromiseMessage{LastGoodRound: 0, Ack: false, Proposal: nil}, nil
 	}
 	res := server.getOrCreatePaxosInstance(msg.PaxosId).Prepare(msg)
 	slog.Debug("Responding", slog.String("response", res.String()))
@@ -85,7 +76,8 @@ func (server *PaxosServerState) Accept(ctx context.Context, msg *AcceptMessage) 
 	defer server.acceptorLock.Unlock()
 	slog.Debug("Received accept", slog.String("msg", msg.String()))
 	if server.minPaxosID > msg.PaxosId {
-		return nil, nil
+		// the leader will eventually realize it is an old Paxos ID
+		return &AcceptResponse{Ack: false}, nil
 	}
 	response, ack := server.getOrCreatePaxosInstance(msg.PaxosId).Accept(msg)
 	if ack {
@@ -128,15 +120,13 @@ func (server *PaxosServerState) tryCommitPaxos() {
 		}
 		paxos = server.ongoingPaxos[server.commitedPaxosID+1]
 	}
-	if len(server.activeWrites) != 0 {
-		// not all writes were commited, need another round
-		go server.notifyLeader(context.Background())
-	}
+	server.commitCond.Broadcast()
 	server.cleanUpOldPaxos()
 }
 
 func (server *PaxosServerState) cleanUpOldPaxos() {
-	if server.commitedPaxosID-server.minPaxosID < config.PaxosCleanupThreshold {
+	// minPaxosID will be 1 above commitedPaxosID if there are no old instances
+	if 1+server.commitedPaxosID-server.minPaxosID > config.PaxosCleanupThreshold {
 		responses := make(chan uint64, config.PaxosMemberCount)
 		for peerID := range config.PaxosMemberCount {
 			go server.sendCommitedIDRequest(peerID, responses)
@@ -149,6 +139,7 @@ func (server *PaxosServerState) cleanUpOldPaxos() {
 		for paxosID := server.minPaxosID; paxosID <= maxCommitedID; paxosID++ {
 			server.deletePaxos(paxosID)
 		}
+		server.minPaxosID = maxCommitedID + 1
 	}
 }
 
@@ -156,37 +147,40 @@ func (server *PaxosServerState) commitActions(actionLocal []ActionLocal, paxosID
 	activeRequestsCount := len(server.activeWrites)
 	for _, action := range actionLocal {
 		entry, exists := server.data[action.key]
-		newRevision := paxosID
-		if exists {
-			newRevision = entry.Revision + 1
-		}
+		success := false
 		// an action will be commited in 1 of 3 cases:
 		// 1. the action did not request a revision check
 		// 2. the action requested a revision check and it passes
 		// 3. the action requested a revision check of 0, which means "only if doesnt exist" and the key doesnt exist
 		if action.revision == nil || (exists && entry.Revision == *action.revision) || (!exists && *action.revision == 0) {
-			server.data[action.key] = &DataEntry{Value: action.value, Revision: newRevision}
+			success = true
+			server.data[action.key] = &DataEntry{Value: action.value, Revision: paxosID}
 		}
-		for i := 0; i < activeRequestsCount; i++ {
-			request := server.activeWrites[i]
-			// checking just the key is sufficient because any group of writes can be commited by commiting one of them and pretending the rest were commited just before it
-			// however, when revision dependant updates are involved, we can only do this if the request is already stale
-			if action.key == request.key && (request.revision == nil || action.revision == nil || *request.revision <= *action.revision) {
-				if action.value != nil {
-					entry, contains := server.data[request.key]
-					if contains {
-						request.replyChannel <- entry.Revision
+		// reply to active writes, only leader has active writes
+		if server.leader == config.PaxosMyID {
+			for i := 0; i < activeRequestsCount; i++ {
+				request := server.activeWrites[i]
+				// checking just the key is sufficient because any group of writes can be commited by commiting one of them and pretending the rest were commited just before it
+				// however, when revision dependant updates are involved, we can only do this if the request is already stale
+				if action.key == request.key &&
+					((action.revision == nil && request.revision == nil) || (*action.revision == *request.revision)) &&
+					((action.value == nil && request.value == nil) || (*action.value == *request.value)) {
+					entry, exists := server.data[request.key]
+					if exists {
+						request.replyChannel <- LocalWriteReply{Success: success, Revision: entry.Revision}
 					} else {
-						request.replyChannel <- 0
+						request.replyChannel <- LocalWriteReply{Success: success, Revision: 0}
 					}
-					slog.Info("Commited write", slog.String("key", action.key), slog.String("value", *action.value))
-				} else {
-					slog.Info("Commited delete", slog.String("key", action.key))
+					if action.value != nil {
+						slog.Info("Commited write", slog.String("key", action.key), slog.String("value", *action.value))
+					} else {
+						slog.Info("Commited delete", slog.String("key", action.key))
+					}
+					close(request.replyChannel)
+					// remove request from active requests
+					server.activeWrites[i] = server.activeWrites[activeRequestsCount-1]
+					activeRequestsCount--
 				}
-				close(request.replyChannel)
-				// remove request from active requests
-				server.activeWrites[i] = server.activeWrites[activeRequestsCount-1]
-				activeRequestsCount--
 			}
 		}
 	}

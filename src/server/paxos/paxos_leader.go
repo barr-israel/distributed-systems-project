@@ -45,85 +45,130 @@ func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, m
 	responses <- res
 }
 
-func (server *PaxosServerState) InitiateRound(ctx context.Context, msg *InitiatiationRequest) (*emptypb.Empty, error) {
-	// TODO: rewrite into the faster implementation
+func (server *PaxosServerState) tryFastPaxos(paxosID uint64) bool {
+	req := <-server.incomingRequests
+	// must wait for the first request to grab the lock
 	server.leaderLock.Lock()
-	defer server.leaderLock.Unlock()
-	if server.leader != config.PaxosMyID {
-		return nil, errors.New("server is not the leader")
+	server.activeWrites = append(server.activeWrites, req)
+	for len(server.incomingRequests) != 0 {
+		req := <-server.incomingRequests
+		server.activeWrites = append(server.activeWrites, req)
 	}
-	if msg.NextPaxosId < server.commitedPaxosID {
-		// already ran the requested round
-		return &emptypb.Empty{}, nil
+	proposal := reqsToActionArray(&server.activeWrites)
+	msg := AcceptMessage{PaxosId: paxosID, Round: 1, Proposal: &Proposal{Actions: proposal}}
+	responses := make(chan *AcceptResponse, config.PaxosMemberCount)
+	for peerID := range config.PaxosMemberCount {
+		go server.sendAccept(context.Background(), peerID, &msg, responses)
 	}
-	slog.Info("Received round request with ID", slog.Uint64("Paxos ID", msg.NextPaxosId))
-	round := uint64(1)
-	preference := make([]*Action, 0)
-	server.maxPaxosID++
-	thisPaxosID := server.maxPaxosID
+	acceptAckCount := uint64(0)
+	acceptNAckCount := uint64(0)
+	for acceptNAckCount < config.PaxosMemberCount/2 {
+		res := <-responses
+		if res.Ack {
+			acceptAckCount++
+			if acceptAckCount > config.PaxosMemberCount/2 {
+				slog.Info("Leader completed paxos", slog.Uint64("Paxos ID", paxosID))
+				// not cancelling the context here because the accept messages are still useful to spread
+				return true
+			}
+		} else {
+			acceptNAckCount++
+		}
+	}
+	return false
+}
+
+func (server *PaxosServerState) runLeader() {
 	for {
-		if server.leader != config.PaxosMyID {
-			// this leader was demoted
-			return nil, errors.New("server is not the leader")
+		thisPaxosID := server.commitedPaxosID + 1
+		slog.Debug("Trying Fast Paxos for", slog.Uint64("Paxos ID", thisPaxosID))
+		succeeded := server.tryFastPaxos(thisPaxosID)
+		if succeeded {
+			server.leaderLock.Unlock()
+			server.waitForCommit(thisPaxosID)
+			continue
 		}
-		msg := PrepareMessage{PaxosId: thisPaxosID, Round: round}
-		responses := make(chan *PromiseMessage, config.PaxosMemberCount)
-		for peerID := range config.PaxosMemberCount {
-			go server.sendPrepare(ctx, peerID, &msg, responses)
-		}
-		prepareAckCount := uint64(0)
-		largestReceivedRound := uint64(0)
-		largestReceivedAckRound := uint64(0)
-		for range config.PaxosMemberCount {
-			res := <-responses
-			largestReceivedRound = max(res.LastGoodRound, largestReceivedRound)
-			if res.Ack {
-				prepareAckCount++
-				if res.LastGoodRound > largestReceivedAckRound {
-					largestReceivedAckRound = res.LastGoodRound
-					preference = res.Proposal.Actions
-				}
-				if round == 1 {
-					// common case optimization: the leader can override its own proposal on the first round
-					preference = append(preference, res.Proposal.Actions...)
-				}
-				if prepareAckCount > config.PaxosMemberCount/2 {
-					if round == 1 {
-						// merge pernding responses as well
-						for len(responses) != 0 {
+		slog.Debug("Fast Paxos failed, falling back to normal")
+		round := uint64(2)
+		preference := make([]*Action, 0)
+	PaxosInstance:
+		for {
+			msg := PrepareMessage{PaxosId: thisPaxosID, Round: round}
+			responses := make(chan *PromiseMessage, config.PaxosMemberCount)
+			for peerID := range config.PaxosMemberCount {
+				go server.sendPrepare(context.Background(), peerID, &msg, responses)
+			}
+			prepareAckCount := uint64(0)
+			prepareNAckCount := uint64(0)
+			largestReceivedRound := uint64(0)
+			largestReceivedAckRound := uint64(0)
+			for prepareNAckCount <= config.PaxosMemberCount/2 {
+				res := <-responses
+				largestReceivedRound = max(res.LastGoodRound, largestReceivedRound)
+				if res.Ack {
+					prepareAckCount++
+					if res.LastGoodRound > largestReceivedAckRound {
+						largestReceivedAckRound = res.LastGoodRound
+						preference = res.Proposal.Actions
+					}
+					if prepareAckCount > config.PaxosMemberCount/2 {
+						msg := AcceptMessage{PaxosId: thisPaxosID, Round: round, Proposal: &Proposal{Actions: preference}}
+						responses := make(chan *AcceptResponse, config.PaxosMemberCount)
+						for peerID := range config.PaxosMemberCount {
+							go server.sendAccept(context.Background(), peerID, &msg, responses)
+						}
+						acceptAckCount := uint64(0)
+						acceptNAckCount := uint64(0)
+						for acceptNAckCount < config.PaxosMemberCount/2 {
 							res := <-responses
 							if res.Ack {
-								preference = append(preference, res.Proposal.Actions...)
+								acceptAckCount++
+								if acceptAckCount > config.PaxosMemberCount/2 {
+									slog.Info("Leader completed paxos", slog.Uint64("Paxos ID", thisPaxosID))
+									// not cancelling the context here because the accept messages are still useful to spread
+									break PaxosInstance
+								}
+							} else {
+								acceptNAckCount++
 							}
 						}
 					}
-					msg := AcceptMessage{PaxosId: thisPaxosID, Round: round, Proposal: &Proposal{Actions: preference}}
-					responses := make(chan *AcceptResponse, config.PaxosMemberCount)
-					for peerID := range config.PaxosMemberCount {
-						go server.sendAccept(ctx, peerID, &msg, responses)
-					}
-					acceptAckCount := uint64(0)
-					for range config.PaxosMemberCount {
-						res := <-responses
-						if res.Ack {
-							acceptAckCount++
-							if acceptAckCount > config.PaxosMemberCount/2 {
-								slog.Info("Leader completed paxos", slog.Uint64("Paxos ID", thisPaxosID))
-								return &emptypb.Empty{}, nil
-							}
-						}
-					}
+				} else {
+					prepareNAckCount++
 				}
 			}
+			// any message about this round is useless at this point
+			// skip ahead of every peer
+			round = max(round, largestReceivedRound) + 1
+			server.refreshLeader(context.Background())
+			if server.leader != config.PaxosMyID {
+				// this leader was demoted
+				return
+			}
 		}
-		// skip ahead of every peer
-		round = max(round, largestReceivedRound) + 1
-		server.refreshLeader(ctx)
+		server.leaderLock.Unlock()
+		server.waitForCommit(thisPaxosID)
 	}
 }
 
+func (server *PaxosServerState) waitForCommit(thisPaxosID uint64) {
+	server.acceptorLock.Lock()
+	defer server.acceptorLock.Unlock()
+	for server.commitedPaxosID != thisPaxosID {
+		server.commitCond.Wait()
+	}
+}
+
+func (server *PaxosServerState) WriteToLeader(_ context.Context, msg *Action) (*WriteReply, error) {
+	replyChannel := make(chan LocalWriteReply, 1)
+	request := LocalWriteRequest{key: msg.Key, value: msg.Value, revision: msg.Revision, replyChannel: replyChannel}
+	server.incomingRequests <- &request
+	reply := <-replyChannel
+	return &WriteReply{Success: reply.Success, Revision: reply.Revision}, nil
+}
+
 func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadReply, error) {
-	// TODO: needs to wait for acceptor to write
+	// TODO: do we actually need the leader lock?
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
 	if server.leader != config.PaxosMyID {
@@ -133,13 +178,14 @@ func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadReque
 	defer server.acceptorLock.Unlock()
 	entry := server.data[msg.Key]
 	if entry != nil {
-		return &ReadReply{Value: entry.Value, Revision: &entry.Revision}, nil
+		return &ReadReply{Value: entry.Value, Revision: entry.Revision}, nil
 	} else {
-		return &ReadReply{Value: nil, Revision: nil}, nil
+		return &ReadReply{Value: nil, Revision: 0}, nil
 	}
 }
 
-func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *emptypb.Empty) (*KeyList, error) {
+func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListRequest) (*KeyList, error) {
+	// TODO: do we actually need the leader lock?
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
 	if server.leader != config.PaxosMyID {
@@ -147,7 +193,7 @@ func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *empty
 	}
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
-	return &KeyList{Keys: server.getKeys()}, nil
+	return &KeyList{Keys: server.getKeys(msg.OmitDeleted)}, nil
 }
 
 func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty) (*State, error) {
@@ -156,11 +202,14 @@ func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty
 	if server.leader != config.PaxosMyID {
 		return nil, errors.New("server is not the leader")
 	}
+	slog.Debug("got state req")
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	dataState := make([]*Action, len(server.data))
+	i := 0
 	for key, entry := range server.data {
-		dataState = append(dataState, &Action{Key: key, Value: entry.Value, Revision: &entry.Revision})
+		dataState[i] = &Action{Key: key, Value: entry.Value, Revision: &entry.Revision}
+		i++
 	}
 	return &State{MinPaxosId: server.minPaxosID, MaxPaxosId: server.maxPaxosID, CommitedPaxosId: server.commitedPaxosID, DataState: &Proposal{Actions: dataState}}, nil
 }

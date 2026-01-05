@@ -30,6 +30,7 @@ func listHandler(paxosServer *paxos.PaxosServerState, writer http.ResponseWriter
 		return
 	}
 	_, linearized := request.Header["Linearized"]
+	_, omitDeleted := request.Header["Omit-Deleted"]
 	_, err := fmt.Fprintf(writer, "[")
 	if err != nil {
 		slog.Error("Error returing key list")
@@ -38,9 +39,9 @@ func listHandler(paxosServer *paxos.PaxosServerState, writer http.ResponseWriter
 	}
 	var keys []string
 	if linearized {
-		keys = paxosServer.ListKeysLinearized(context.Background())
+		keys = paxosServer.ListKeysLinearized(context.Background(), omitDeleted)
 	} else {
-		keys = paxosServer.ListKeys(context.Background())
+		keys = paxosServer.ListKeys(context.Background(), omitDeleted)
 	}
 	for i, key := range keys {
 		if i == len(keys)-1 {
@@ -80,8 +81,13 @@ func handleGet(request *http.Request, paxosServer *paxos.PaxosServerState, write
 		response = paxosServer.Read(context.Background(), key)
 	}
 	if response != nil {
+		var err error
 		writer.Header().Set("Content-Type", "application/json")
-		_, err := fmt.Fprintf(writer, "{value:%s,revision:%d}", *response.Value, response.Revision)
+		if response.Value != nil {
+			_, err = fmt.Fprintf(writer, "{value:\"%s\",revision:%d}", *response.Value, response.Revision)
+		} else {
+			_, err = fmt.Fprintf(writer, "{\"value\":null,\"revision\":%d}", response.Revision)
+		}
 		if err != nil {
 			slog.Error("Error in HTTP GET")
 		}
@@ -93,15 +99,15 @@ func handleGet(request *http.Request, paxosServer *paxos.PaxosServerState, write
 func handlePut(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter) {
 	slog.Info("Received HTTP PUT", slog.String("Headers", fmt.Sprint(request.Header)))
 	value := request.Header.Get("value")
-	handlerWrite(request, paxosServer, writer, &value)
+	handleWrite(request, paxosServer, writer, &value)
 }
 
 func handleDelete(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter) {
 	slog.Info("Received HTTP DELETE", slog.String("Headers", fmt.Sprint(request.Header)))
-	handlerWrite(request, paxosServer, writer, nil)
+	handleWrite(request, paxosServer, writer, nil)
 }
 
-func handlerWrite(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter, value *string) {
+func handleWrite(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter, value *string) {
 	_, async := request.Header["Async"]
 	key := request.Header.Get("key")
 	revisionStr := request.Header.Get("revision")
@@ -115,18 +121,15 @@ func handlerWrite(request *http.Request, paxosServer *paxos.PaxosServerState, wr
 		revision = &parsed
 	}
 	if async {
-		paxosServer.AsyncWrite(context.Background(), key, value, revision)
+		go paxosServer.Write(context.Background(), key, value, revision)
 		writer.WriteHeader(200)
 	} else {
 		writer.Header().Set("Content-Type", "application/json")
-		currentRevision := paxosServer.Write(context.Background(), key, value, revision)
-		if revision == nil || *revision+1 == currentRevision {
-			writer.WriteHeader(200)
-		} else {
+		res := paxosServer.Write(context.Background(), key, value, revision)
+		if !res.Success {
 			writer.WriteHeader(412)
 		}
-		slog.Debug("", slog.Uint64("rev", currentRevision))
-		_, err := fmt.Fprintf(writer, "{\"revision\":%d}", currentRevision)
+		_, err := fmt.Fprintf(writer, "{\"success\":%t\"revision\":%d}", res.Success, res.Revision)
 		if err != nil {
 			slog.Error("Error in HTTP PUT/DELETE")
 		}

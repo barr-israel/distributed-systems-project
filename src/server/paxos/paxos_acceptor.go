@@ -18,7 +18,7 @@ func toActionLocalArray(as *[]*Action) *[]ActionLocal {
 	return &actions
 }
 
-func reqsToActionLocalArray(reqs *[]*PaxosLocalRequest) *[]ActionLocal {
+func reqsToActionLocalArray(reqs *[]*LocalWriteRequest) *[]ActionLocal {
 	actions := make([]ActionLocal, len(*reqs))
 	for i, a := range *reqs {
 		actions[i] = a.toActionLocal()
@@ -35,6 +35,15 @@ func toActionArray(as *[]ActionLocal) []*Action {
 	return actions
 }
 
+func reqsToActionArray(as *[]*LocalWriteRequest) []*Action {
+	actions := make([]*Action, len(*as))
+	for i, a := range *as {
+		action := a.toAction()
+		actions[i] = &action
+	}
+	return actions
+}
+
 func (a *Action) toActionLocal() ActionLocal {
 	return ActionLocal{key: a.Key, value: a.Value, revision: a.Revision}
 }
@@ -43,8 +52,12 @@ func (a *ActionLocal) toAction() Action {
 	return Action{Key: a.key, Value: a.value, Revision: a.revision}
 }
 
-func (req *PaxosLocalRequest) toActionLocal() ActionLocal {
+func (req *LocalWriteRequest) toActionLocal() ActionLocal {
 	return ActionLocal{key: req.key, value: req.value, revision: req.revision}
+}
+
+func (req *LocalWriteRequest) toAction() Action {
+	return Action{Key: req.key, Value: req.value, Revision: req.revision}
 }
 
 type PaxosInstance struct {
@@ -118,9 +131,9 @@ func (p *PaxosInstance) Accepted(msg *AcceptedMessage) bool {
 	return commit
 }
 
-func NewPaxosInstance(requests []*PaxosLocalRequest) *PaxosInstance {
+func NewPaxosInstance() *PaxosInstance {
 	proposals := make([]*[]ActionLocal, 2)
-	actions := reqsToActionLocalArray(&requests)
-	proposals[1] = actions
-	return &PaxosInstance{proposals: proposals, preference: actions}
+	actions := make([]ActionLocal, 0)
+	proposals[1] = &actions
+	return &PaxosInstance{proposals: proposals, preference: &actions}
 }

@@ -23,7 +23,7 @@ const (
 	Paxos_Prepare_FullMethodName            = "/Paxos/Prepare"
 	Paxos_Accept_FullMethodName             = "/Paxos/Accept"
 	Paxos_Accepted_FullMethodName           = "/Paxos/Accepted"
-	Paxos_InitiateRound_FullMethodName      = "/Paxos/InitiateRound"
+	Paxos_WriteToLeader_FullMethodName      = "/Paxos/WriteToLeader"
 	Paxos_ReadFromLeader_FullMethodName     = "/Paxos/ReadFromLeader"
 	Paxos_ReadListFromLeader_FullMethodName = "/Paxos/ReadListFromLeader"
 	Paxos_SuggestPromoteSelf_FullMethodName = "/Paxos/SuggestPromoteSelf"
@@ -38,9 +38,9 @@ type PaxosClient interface {
 	Prepare(ctx context.Context, in *PrepareMessage, opts ...grpc.CallOption) (*PromiseMessage, error)
 	Accept(ctx context.Context, in *AcceptMessage, opts ...grpc.CallOption) (*AcceptResponse, error)
 	Accepted(ctx context.Context, in *AcceptedMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	InitiateRound(ctx context.Context, in *InitiatiationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	WriteToLeader(ctx context.Context, in *Action, opts ...grpc.CallOption) (*WriteReply, error)
 	ReadFromLeader(ctx context.Context, in *ReadRequestMessage, opts ...grpc.CallOption) (*ReadReply, error)
-	ReadListFromLeader(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*KeyList, error)
+	ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyList, error)
 	SuggestPromoteSelf(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PromotionReply, error)
 	RequestState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*State, error)
 	GetCommitedPaxosID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CommitedPaxosID, error)
@@ -84,10 +84,10 @@ func (c *paxosClient) Accepted(ctx context.Context, in *AcceptedMessage, opts ..
 	return out, nil
 }
 
-func (c *paxosClient) InitiateRound(ctx context.Context, in *InitiatiationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *paxosClient) WriteToLeader(ctx context.Context, in *Action, opts ...grpc.CallOption) (*WriteReply, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, Paxos_InitiateRound_FullMethodName, in, out, cOpts...)
+	out := new(WriteReply)
+	err := c.cc.Invoke(ctx, Paxos_WriteToLeader_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (c *paxosClient) ReadFromLeader(ctx context.Context, in *ReadRequestMessage
 	return out, nil
 }
 
-func (c *paxosClient) ReadListFromLeader(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*KeyList, error) {
+func (c *paxosClient) ReadListFromLeader(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*KeyList, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(KeyList)
 	err := c.cc.Invoke(ctx, Paxos_ReadListFromLeader_FullMethodName, in, out, cOpts...)
@@ -151,9 +151,9 @@ type PaxosServer interface {
 	Prepare(context.Context, *PrepareMessage) (*PromiseMessage, error)
 	Accept(context.Context, *AcceptMessage) (*AcceptResponse, error)
 	Accepted(context.Context, *AcceptedMessage) (*emptypb.Empty, error)
-	InitiateRound(context.Context, *InitiatiationRequest) (*emptypb.Empty, error)
+	WriteToLeader(context.Context, *Action) (*WriteReply, error)
 	ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error)
-	ReadListFromLeader(context.Context, *emptypb.Empty) (*KeyList, error)
+	ReadListFromLeader(context.Context, *ListRequest) (*KeyList, error)
 	SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error)
 	RequestState(context.Context, *emptypb.Empty) (*State, error)
 	GetCommitedPaxosID(context.Context, *emptypb.Empty) (*CommitedPaxosID, error)
@@ -176,13 +176,13 @@ func (UnimplementedPaxosServer) Accept(context.Context, *AcceptMessage) (*Accept
 func (UnimplementedPaxosServer) Accepted(context.Context, *AcceptedMessage) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method Accepted not implemented")
 }
-func (UnimplementedPaxosServer) InitiateRound(context.Context, *InitiatiationRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method InitiateRound not implemented")
+func (UnimplementedPaxosServer) WriteToLeader(context.Context, *Action) (*WriteReply, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteToLeader not implemented")
 }
 func (UnimplementedPaxosServer) ReadFromLeader(context.Context, *ReadRequestMessage) (*ReadReply, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadFromLeader not implemented")
 }
-func (UnimplementedPaxosServer) ReadListFromLeader(context.Context, *emptypb.Empty) (*KeyList, error) {
+func (UnimplementedPaxosServer) ReadListFromLeader(context.Context, *ListRequest) (*KeyList, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReadListFromLeader not implemented")
 }
 func (UnimplementedPaxosServer) SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error) {
@@ -269,20 +269,20 @@ func _Paxos_Accepted_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Paxos_InitiateRound_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(InitiatiationRequest)
+func _Paxos_WriteToLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Action)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(PaxosServer).InitiateRound(ctx, in)
+		return srv.(PaxosServer).WriteToLeader(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Paxos_InitiateRound_FullMethodName,
+		FullMethod: Paxos_WriteToLeader_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PaxosServer).InitiateRound(ctx, req.(*InitiatiationRequest))
+		return srv.(PaxosServer).WriteToLeader(ctx, req.(*Action))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -306,7 +306,7 @@ func _Paxos_ReadFromLeader_Handler(srv interface{}, ctx context.Context, dec fun
 }
 
 func _Paxos_ReadListFromLeader_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(emptypb.Empty)
+	in := new(ListRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -318,7 +318,7 @@ func _Paxos_ReadListFromLeader_Handler(srv interface{}, ctx context.Context, dec
 		FullMethod: Paxos_ReadListFromLeader_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(PaxosServer).ReadListFromLeader(ctx, req.(*emptypb.Empty))
+		return srv.(PaxosServer).ReadListFromLeader(ctx, req.(*ListRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -397,8 +397,8 @@ var Paxos_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Paxos_Accepted_Handler,
 		},
 		{
-			MethodName: "InitiateRound",
-			Handler:    _Paxos_InitiateRound_Handler,
+			MethodName: "WriteToLeader",
+			Handler:    _Paxos_WriteToLeader_Handler,
 		},
 		{
 			MethodName: "ReadFromLeader",
