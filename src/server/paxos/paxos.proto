@@ -13,7 +13,7 @@ message Proposal{
 }
 
 message InitiatiationRequest{
-  uint64 next_paxos_id = 1;
+  uint64 seen_commited_id = 1;
 }
 
 message ReadRequestMessage{

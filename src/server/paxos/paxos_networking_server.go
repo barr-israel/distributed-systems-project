@@ -5,7 +5,6 @@ package paxos
 
 import (
 	"context"
-	"log"
 	"log/slog"
 	"time"
 
@@ -67,6 +66,8 @@ func (server *PaxosServerState) sendCommitedIDRequest(peerID uint64, responses c
 	responses <- res.CommitedPaxosId
 }
 
+// TODO: add leader check
+
 func (server *PaxosServerState) Prepare(ctx context.Context, msg *PrepareMessage) (*PromiseMessage, error) {
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
@@ -108,8 +109,6 @@ func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessa
 	commit := p.Accepted(msg)
 	if commit {
 		server.tryCommitPaxos()
-	} else if p.IsDone() {
-		server.deletePaxos(msg.PaxosId)
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -121,10 +120,10 @@ func (server *PaxosServerState) GetCommitedPaxosID(ctx context.Context, _ *empty
 func (server *PaxosServerState) tryCommitPaxos() {
 	paxos := server.ongoingPaxos[server.commitedPaxosID+1]
 	for paxos != nil && paxos.decided {
-		server.commitActions(paxos.proposal)
 		server.commitedPaxosID++
-		slog.Debug("Commited paxos:", slog.Uint64("paxosID", server.commitedPaxosID), slog.Any("actions", paxos.proposal))
-		if paxos.IsDone() {
+		server.commitActions(*paxos.preference, server.commitedPaxosID)
+		slog.Debug("Commited paxos:", slog.Uint64("paxosID", server.commitedPaxosID), slog.Any("actions", paxos.proposals))
+		if paxos.done {
 			server.deletePaxos(server.commitedPaxosID)
 		}
 		paxos = server.ongoingPaxos[server.commitedPaxosID+1]
@@ -153,33 +152,20 @@ func (server *PaxosServerState) cleanUpOldPaxos() {
 	}
 }
 
-func (server *PaxosServerState) commitActions(actionLocal []ActionLocal) {
+func (server *PaxosServerState) commitActions(actionLocal []ActionLocal, paxosID uint64) {
 	activeRequestsCount := len(server.activeWrites)
 	for _, action := range actionLocal {
 		entry, exists := server.data[action.key]
-		if action.revision == nil {
-			// no revision check requested, update or delete normally
-			if action.value != nil {
-				revision := uint64(1)
-				if exists {
-					revision = entry.Revision + uint64(1)
-				}
-				server.data[action.key] = &DataEntry{Value: action.value, Revision: revision}
-			} else {
-				delete(server.data, action.key)
-			}
-		} else if exists && *action.revision == entry.Revision {
-			// revision check requested, so the entry must exist with the given revision
-			if action.value != nil {
-				server.data[action.key] = &DataEntry{Value: action.value, Revision: entry.Revision + 1}
-			} else {
-				delete(server.data, action.key)
-			}
-		} else if *action.revision == 0 {
-			// revision specifically requested to write if doesnt exist
-			if action.value != nil {
-				server.data[action.key] = &DataEntry{Value: action.value, Revision: 1}
-			}
+		newRevision := paxosID
+		if exists {
+			newRevision = entry.Revision + 1
+		}
+		// an action will be commited in 1 of 3 cases:
+		// 1. the action did not request a revision check
+		// 2. the action requested a revision check and it passes
+		// 3. the action requested a revision check of 0, which means "only if doesnt exist" and the key doesnt exist
+		if action.revision == nil || (exists && entry.Revision == *action.revision) || (!exists && *action.revision == 0) {
+			server.data[action.key] = &DataEntry{Value: action.value, Revision: newRevision}
 		}
 		for i := 0; i < activeRequestsCount; i++ {
 			request := server.activeWrites[i]
@@ -206,7 +192,7 @@ func (server *PaxosServerState) commitActions(actionLocal []ActionLocal) {
 	}
 	// only keep unfulfilled requests
 	server.activeWrites = server.activeWrites[:activeRequestsCount]
-	log.Println("remaining requests: ", server.activeWrites)
+	slog.Debug("remaining", slog.Int("requests", len(server.activeWrites)))
 }
 
 func (server *PaxosServerState) deletePaxos(paxosID uint64) {

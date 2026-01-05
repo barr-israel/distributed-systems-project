@@ -121,7 +121,7 @@ func SetupGRPC(ctx context.Context, cli *etcd.EtcdClient) *PaxosServerState {
 		peers[peerID] = grpcClient
 	}
 	incomingRequests := make(chan PaxosLocalRequest, config.PaxosMaxReqPerRound)
-	server := &PaxosServerState{ctx: ctx, etcdClient: cli, connections: connections, peers: peers, incomingRequests: incomingRequests, ongoingPaxos: make(map[uint64]*PaxosInstance), data: make(map[string]*DataEntry)}
+	server := &PaxosServerState{ctx: ctx, etcdClient: cli, connections: connections, peers: peers, incomingRequests: incomingRequests, ongoingPaxos: make(map[uint64]*PaxosInstance), data: make(map[string]*DataEntry), minPaxosID: 1}
 	server.tryRecover(ctx)
 	cli.PublishReady()
 	cli.WaitForEnoughReady()

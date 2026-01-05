@@ -46,12 +46,13 @@ func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, m
 }
 
 func (server *PaxosServerState) InitiateRound(ctx context.Context, msg *InitiatiationRequest) (*emptypb.Empty, error) {
+	// TODO: rewrite into the faster implementation
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
 	if server.leader != config.PaxosMyID {
 		return nil, errors.New("server is not the leader")
 	}
-	if msg.NextPaxosId < server.maxPaxosID {
+	if msg.NextPaxosId < server.commitedPaxosID {
 		// already ran the requested round
 		return &emptypb.Empty{}, nil
 	}
@@ -61,6 +62,10 @@ func (server *PaxosServerState) InitiateRound(ctx context.Context, msg *Initiati
 	server.maxPaxosID++
 	thisPaxosID := server.maxPaxosID
 	for {
+		if server.leader != config.PaxosMyID {
+			// this leader was demoted
+			return nil, errors.New("server is not the leader")
+		}
 		msg := PrepareMessage{PaxosId: thisPaxosID, Round: round}
 		responses := make(chan *PromiseMessage, config.PaxosMemberCount)
 		for peerID := range config.PaxosMemberCount {
@@ -73,21 +78,23 @@ func (server *PaxosServerState) InitiateRound(ctx context.Context, msg *Initiati
 			res := <-responses
 			largestReceivedRound = max(res.LastGoodRound, largestReceivedRound)
 			if res.Ack {
+				prepareAckCount++
 				if res.LastGoodRound > largestReceivedAckRound {
 					largestReceivedAckRound = res.LastGoodRound
 					preference = res.Proposal.Actions
 				}
-				if largestReceivedAckRound == 0 {
-					// common case optimization: the leader can act as an N+1 participant with r'=0 with any proposal it wants, including merging all known proposals
+				if round == 1 {
+					// common case optimization: the leader can override its own proposal on the first round
 					preference = append(preference, res.Proposal.Actions...)
 				}
-				prepareAckCount++
 				if prepareAckCount > config.PaxosMemberCount/2 {
-					// read remaining promises incase they have more to merge, and once we have enough promises, it is guaranteed again that no accepts have been made
-					for len(responses) != 0 {
-						res := <-responses
-						if res.Ack {
-							preference = append(preference, res.Proposal.Actions...)
+					if round == 1 {
+						// merge pernding responses as well
+						for len(responses) != 0 {
+							res := <-responses
+							if res.Ack {
+								preference = append(preference, res.Proposal.Actions...)
+							}
 						}
 					}
 					msg := AcceptMessage{PaxosId: thisPaxosID, Round: round, Proposal: &Proposal{Actions: preference}}
@@ -111,10 +118,12 @@ func (server *PaxosServerState) InitiateRound(ctx context.Context, msg *Initiati
 		}
 		// skip ahead of every peer
 		round = max(round, largestReceivedRound) + 1
+		server.refreshLeader(ctx)
 	}
 }
 
 func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadReply, error) {
+	// TODO: needs to wait for acceptor to write
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
 	if server.leader != config.PaxosMyID {

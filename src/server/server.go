@@ -12,8 +12,12 @@ import (
 )
 
 func main() {
-	slog.SetLogLoggerLevel(slog.LevelDebug)
 	config.SetupConf()
+	if config.Verbose {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	} else {
+		slog.SetLogLoggerLevel(slog.LevelInfo)
+	}
 	client := etcd.EtcdSetup()
 	// RecoverData(&data)
 	paxosServer := paxos.SetupGRPC(context.Background(), &client)
