@@ -19,7 +19,6 @@ func main() {
 		slog.SetLogLoggerLevel(slog.LevelInfo)
 	}
 	client := etcd.EtcdSetup()
-	// RecoverData(&data)
 	paxosServer := paxos.SetupGRPC(context.Background(), &client)
 	StartHTTPServer(paxosServer)
 	awaitInterrupt()

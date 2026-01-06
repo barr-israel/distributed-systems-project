@@ -11,6 +11,8 @@ import (
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
+// RELIABLY send a PREPARE message to an acceptor
+// To ensure the message arrives even if the current peer crashes, it retries until the peer replies
 func (server *PaxosServerState) sendPrepare(ctx context.Context, peerID uint64, msg *PrepareMessage, responses chan<- *PromiseMessage) {
 	slog.Debug("Sending prepare", slog.Uint64("Peer ID", uint64(peerID)), slog.String("msg", msg.String()))
 	peer := server.peers[peerID]
@@ -28,6 +30,8 @@ func (server *PaxosServerState) sendPrepare(ctx context.Context, peerID uint64, 
 	responses <- res
 }
 
+// RELIABLY send a ACCEPT message to an acceptor
+// To ensure the message arrives even if the current peer crashes, it retries until the peer replies
 func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, msg *AcceptMessage, responses chan<- *AcceptResponse) {
 	slog.Debug("Sending accept", slog.Uint64("Peer ID", uint64(peerID)), slog.String("msg", msg.String()))
 	peer := server.peers[peerID]
@@ -45,13 +49,15 @@ func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, m
 	responses <- res
 }
 
+// before running the full paxos leader algorithm, try to immediately send ACCEPT to all the acceptors
+// if this is the first leader for this Paxos ID, this will succeed
 func (server *PaxosServerState) tryFastPaxos(paxosID uint64) bool {
 	req := <-server.incomingRequests
 	// must wait for the first request to grab the lock
 	slog.Debug("Trying Fast Paxos for", slog.Uint64("Paxos ID", paxosID))
 	server.leaderLock.Lock()
 	server.activeWrites = append(server.activeWrites, req)
-	for len(server.incomingRequests) != 0 {
+	for len(server.incomingRequests) != 0 && len(server.activeWrites) < int(config.PaxosMaxReqPerRound) {
 		req := <-server.incomingRequests
 		server.activeWrites = append(server.activeWrites, req)
 	}
@@ -79,12 +85,14 @@ func (server *PaxosServerState) tryFastPaxos(paxosID uint64) bool {
 	return false
 }
 
+// run the leader Paxos algorithm as long as this peer is the leader
 func (server *PaxosServerState) runLeader() {
 	for {
 		thisPaxosID := server.commitedPaxosID + 1
 		succeeded := server.tryFastPaxos(thisPaxosID)
 		if succeeded {
 			server.leaderLock.Unlock()
+			// the leader must wait for the acceptor that is on the same peer to commit this Paxos instance before continuing to the next
 			server.waitForCommit(thisPaxosID)
 			continue
 		}
@@ -102,6 +110,7 @@ func (server *PaxosServerState) runLeader() {
 			prepareNAckCount := uint64(0)
 			largestReceivedRound := uint64(0)
 			largestReceivedAckRound := uint64(0)
+			// read PREPARE responses until we have enough ACKs or until it is impossible to have enough
 			for prepareNAckCount <= config.PaxosMemberCount/2 {
 				res := <-responses
 				largestReceivedRound = max(res.LastGoodRound, largestReceivedRound)
@@ -112,6 +121,7 @@ func (server *PaxosServerState) runLeader() {
 						preference = res.Proposal.Actions
 					}
 					if prepareAckCount > config.PaxosMemberCount/2 {
+						// there are enough PREPARE ACKs
 						msg := AcceptMessage{PaxosId: thisPaxosID, Round: round, Proposal: &Proposal{Actions: preference}}
 						responses := make(chan *AcceptResponse, config.PaxosMemberCount)
 						for peerID := range config.PaxosMemberCount {
@@ -119,13 +129,14 @@ func (server *PaxosServerState) runLeader() {
 						}
 						acceptAckCount := uint64(0)
 						acceptNAckCount := uint64(0)
+						// read ACCEPT responses until we have enough or until it is impossible to have enough
 						for acceptNAckCount < config.PaxosMemberCount/2 {
 							res := <-responses
 							if res.Ack {
 								acceptAckCount++
 								if acceptAckCount > config.PaxosMemberCount/2 {
+									// there are enough ACCEPT ACKs
 									slog.Info("Leader completed paxos", slog.Uint64("Paxos ID", thisPaxosID))
-									// not cancelling the context here because the accept messages are still useful to spread
 									break PaxosInstance
 								}
 							} else {
@@ -141,24 +152,27 @@ func (server *PaxosServerState) runLeader() {
 			// skip ahead of every peer
 			round = max(round, largestReceivedRound) + 1
 			server.refreshLeader(context.Background())
-			if server.leader != config.PaxosMyID {
+			if server.leader != config.MyPeerID {
 				// this leader was demoted
 				return
 			}
 		}
 		server.leaderLock.Unlock()
+		// the leader must wait for the acceptor that is on the same peer to commit this Paxos instance before continuing to the next
 		server.waitForCommit(thisPaxosID)
 	}
 }
 
-func (server *PaxosServerState) waitForCommit(thisPaxosID uint64) {
+// waits for a given paxos ID to be commited
+func (server *PaxosServerState) waitForCommit(paxosID uint64) {
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
-	for server.commitedPaxosID != thisPaxosID {
+	for server.commitedPaxosID != paxosID {
 		server.commitCond.Wait()
 	}
 }
 
+// WriteToLeader performs a linearized conditional write into the database
 func (server *PaxosServerState) WriteToLeader(_ context.Context, msg *Action) (*WriteReply, error) {
 	replyChannel := make(chan LocalWriteReply, 1)
 	request := LocalWriteRequest{key: msg.Key, value: msg.Value, revision: msg.Revision, replyChannel: replyChannel}
@@ -167,10 +181,11 @@ func (server *PaxosServerState) WriteToLeader(_ context.Context, msg *Action) (*
 	return &WriteReply{Success: reply.Success, Revision: reply.Revision}, nil
 }
 
+// ReadRevisionFromLeader performs a linearized read of a revision of a given key
 func (server *PaxosServerState) ReadRevisionFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadRevisionReply, error) {
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
-	if server.leader != config.PaxosMyID {
+	if server.leader != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}
 	server.acceptorLock.Lock()
@@ -183,10 +198,11 @@ func (server *PaxosServerState) ReadRevisionFromLeader(_ context.Context, msg *R
 	}
 }
 
+// ReadFromLeader performs a linearized read of a value and revision of a given key
 func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadReply, error) {
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
-	if server.leader != config.PaxosMyID {
+	if server.leader != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}
 	server.acceptorLock.Lock()
@@ -199,10 +215,11 @@ func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadReque
 	}
 }
 
+// ReadListFromLeader performs a linearized read of all the keys and their revisions
 func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListRequest) (*KeyRevsList, error) {
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
-	if server.leader != config.PaxosMyID {
+	if server.leader != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}
 	server.acceptorLock.Lock()
@@ -210,10 +227,11 @@ func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListR
 	return &KeyRevsList{Keyrevs: server.getKeys(msg.OmitDeleted)}, nil
 }
 
+// RequestState replies with all the data needed for a recovering peer to join in the next Paxos instance
 func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty) (*State, error) {
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
-	if server.leader != config.PaxosMyID {
+	if server.leader != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}
 	slog.Debug("got state req")
@@ -225,9 +243,10 @@ func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty
 		dataState[i] = &Action{Key: key, Value: entry.Value, Revision: &entry.Revision}
 		i++
 	}
-	return &State{MinPaxosId: server.minPaxosID, MaxPaxosId: server.maxPaxosID, CommitedPaxosId: server.commitedPaxosID, DataState: &Proposal{Actions: dataState}}, nil
+	return &State{MinPaxosId: server.minPaxosID, CommitedPaxosId: server.commitedPaxosID, DataState: &Proposal{Actions: dataState}}, nil
 }
 
+// SuggestPromoteSelf gets the leader, attempts to become the leader if there isn't one, and replies with the current leader
 func (server *PaxosServerState) SuggestPromoteSelf(ctx context.Context, _ *emptypb.Empty) (*PromotionReply, error) {
 	server.refreshLeader(ctx)
 	return &PromotionReply{Leader: server.leader}, nil

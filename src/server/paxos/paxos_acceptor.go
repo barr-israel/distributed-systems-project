@@ -65,7 +65,10 @@ func (p *PaxosInstance) getDecidedValue() *[]ActionLocal {
 	return p.proposals[p.preference]
 }
 
-func (p *PaxosInstance) getActionsForRound(round uint64) (*Proposal, error) {
+// returns the proposal that was locked in for a particular round
+// this function will only be called in response to sending an ACCEPTED on this round,
+// so it should always succeed unless there is a crash.
+func (p *PaxosInstance) getProposalForRound(round uint64) (*Proposal, error) {
 	if int(round) >= len(p.proposals) {
 		return nil, errors.New("requested round not found")
 	}
@@ -76,14 +79,17 @@ func (p *PaxosInstance) getActionsForRound(round uint64) (*Proposal, error) {
 	return &Proposal{Actions: toActionArray(proposal)}, nil
 }
 
-func (p *PaxosInstance) FillInProposal(round uint64, res *Proposal) {
+// fills in a missing proposal for a given round
+func (p *PaxosInstance) fillInProposal(round uint64, res *Proposal) {
 	p.proposals[round] = toActionLocalArray(&res.Actions)
 }
 
+// whether we are missing a proposal for the given round
 func (p *PaxosInstance) missingProposal(round uint64) bool {
-	return p.proposals[round] == nil && round == p.preference
+	return p.proposals[round] == nil
 }
 
+// resize the proposals and acceptedReceived buffers so they can be used for a new round
 func (p *PaxosInstance) extendBuffersTo(size int) {
 	if len(p.proposals) > size {
 		return
@@ -104,6 +110,7 @@ func (p *PaxosInstance) extendBuffersTo(size int) {
 	}
 }
 
+// Prepare implements handling PREPARE messages in the Paxos algorithm
 func (p *PaxosInstance) Prepare(msg *PrepareMessage) *PromiseMessage {
 	if msg.Round > p.lastRound && !p.decided {
 		p.lastRound = msg.Round
@@ -114,6 +121,7 @@ func (p *PaxosInstance) Prepare(msg *PrepareMessage) *PromiseMessage {
 	}
 }
 
+// Accept implements handling ACCEPT messages in the Paxos algorithm
 func (p *PaxosInstance) Accept(msg *AcceptMessage) (*AcceptedMessage, bool) {
 	ack := msg.Round >= p.lastRound || p.lastRound == 0
 	if ack && !p.decided {
@@ -124,11 +132,12 @@ func (p *PaxosInstance) Accept(msg *AcceptMessage) (*AcceptedMessage, bool) {
 			p.proposals[msg.Round] = toActionLocalArray(&msg.Proposal.Actions)
 		}
 		p.preference = msg.Round
-		return &AcceptedMessage{PaxosId: msg.PaxosId, Round: msg.Round, SenderId: config.PaxosMyID}, true
+		return &AcceptedMessage{PaxosId: msg.PaxosId, Round: msg.Round, SenderId: config.MyPeerID}, true
 	}
 	return nil, false
 }
 
+// Accepted implements handling ACCEPTED messages in the Paxos algorithm
 func (p *PaxosInstance) Accepted(msg *AcceptedMessage) bool {
 	p.extendBuffersTo(int(msg.Round) + 1)
 	p.acceptedReceived[msg.Round]++
@@ -143,6 +152,7 @@ func (p *PaxosInstance) Accepted(msg *AcceptedMessage) bool {
 	return commit
 }
 
+// NewPaxosInstance initializes a new Paxos instance)
 func NewPaxosInstance() *PaxosInstance {
 	proposals := make([]*[]ActionLocal, 2)
 	return &PaxosInstance{proposals: proposals, preference: 1}

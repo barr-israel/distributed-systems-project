@@ -23,6 +23,7 @@ type EtcdClient struct {
 	keepAliveDone   chan struct{}
 }
 
+// WaitForEnoughReady waits for more than half of the peers to be ready
 func (client *EtcdClient) WaitForEnoughReady() {
 	slog.Info("Waiting for enough peers to start")
 	res, err := client.client.Get(context.Background(), "ready/", clientv3.WithPrefix(), clientv3.WithCountOnly())
@@ -55,6 +56,7 @@ func (client *EtcdClient) WaitForEnoughReady() {
 	util.SlogPanic("Watch failed before enough peers connected")
 }
 
+// reads a string from the etcd server
 func readString(client *clientv3.Client, key string) string {
 	res, err := client.Get(context.Background(), key)
 	if err != nil || res.Count == 0 {
@@ -63,6 +65,7 @@ func readString(client *clientv3.Client, key string) string {
 	return string(res.Kvs[0].Value)
 }
 
+// reads an integer from the etcd server
 func readInt(client *clientv3.Client, key string) uint64 {
 	str := readString(client, key)
 	parsed, err := strconv.ParseUint(str, 10, 64)
@@ -72,9 +75,10 @@ func readInt(client *clientv3.Client, key string) uint64 {
 	return parsed
 }
 
+// reads all the configuration values from the etcd server
 func readConfig(client *clientv3.Client) {
-	config.PaxosListenAddress = readString(client, "paxos_listen_address/"+config.PaxosMyIDStr)
-	config.HTTPListenAddress = readString(client, "http_listen_address/"+config.PaxosMyIDStr)
+	config.PaxosListenAddress = readString(client, "paxos_listen_address/"+config.MyPeerIDStr)
+	config.HTTPListenAddress = readString(client, "http_listen_address/"+config.MyPeerIDStr)
 	config.PaxosMemberCount = readInt(client, "paxos_member_count")
 	config.PaxosMaxReqPerRound = readInt(client, "paxos_max_req_per_round")
 	config.PaxosCleanupThreshold = readInt(client, "paxos_cleanup_threshold")
@@ -83,8 +87,10 @@ func readConfig(client *clientv3.Client) {
 	config.PaxosArtificialDelay = time.Duration(int64(readInt(client, "paxos_artificial_delay_milliseconds"))) * time.Millisecond
 }
 
+// PublishReady adds this peer to the list of ready peers on the etcd server,
+// the addition is using the lease of this peer and will be deleted if it expires
 func (client *EtcdClient) PublishReady() {
-	paxosIDStr := strconv.FormatUint(uint64(config.PaxosMyID), 10)
+	paxosIDStr := strconv.FormatUint(uint64(config.MyPeerID), 10)
 	myReadyKey := "ready/" + paxosIDStr
 	cmp := clientv3.Compare(clientv3.CreateRevision(myReadyKey), "=", 0)
 	put := clientv3.OpPut(myReadyKey, config.PaxosListenAddress, clientv3.WithLease(client.leaseID))
@@ -97,6 +103,7 @@ func (client *EtcdClient) PublishReady() {
 	}
 }
 
+// Close shuts down the etcd client and gracefully revokes the lease this peer was using
 func (client *EtcdClient) Close() {
 	client.keepAliveCancel()
 	<-client.keepAliveDone
@@ -126,6 +133,7 @@ func keepAlive(ctx context.Context, cli *clientv3.Client, leaseID clientv3.Lease
 	cancel()
 }
 
+// EtcdSetup sets up the etcd client, obtains a lease and launches the keep alive loop
 func EtcdSetup() EtcdClient {
 	slog.Info("Starting etcd client")
 	cli, err := clientv3.NewFromURL(config.EtcdListenAddress)
@@ -145,6 +153,8 @@ func EtcdSetup() EtcdClient {
 	return client
 }
 
+// RefreshLeader gets the current leader or becomes the leader if there isnt one,
+// returns the current leader
 func (client *EtcdClient) RefreshLeader(ctx context.Context) uint64 {
 	leader, err := client.tryGetLeader(ctx)
 	if err != nil {
@@ -153,6 +163,7 @@ func (client *EtcdClient) RefreshLeader(ctx context.Context) uint64 {
 	return leader
 }
 
+// GetReadyPeers returns the list of peers that are ready
 func (client *EtcdClient) GetReadyPeers(ctx context.Context) *clientv3.GetResponse {
 	alivePeers, err := client.client.Get(ctx, "ready/", clientv3.WithPrefix())
 	if err != nil {
@@ -161,6 +172,7 @@ func (client *EtcdClient) GetReadyPeers(ctx context.Context) *clientv3.GetRespon
 	return alivePeers
 }
 
+// GetPeerAddress gets the gRPC listen address of a given peer
 func (client *EtcdClient) GetPeerAddress(ctx context.Context, peerID uint64) string {
 	key := "paxos_listen_address/" + strconv.FormatUint(peerID, 10)
 	res, err := client.client.Get(ctx, key)
@@ -170,9 +182,11 @@ func (client *EtcdClient) GetPeerAddress(ctx context.Context, peerID uint64) str
 	return string(res.Kvs[0].Value)
 }
 
+// tries to become the leader if there isnt one
+// using a transaction to effectively implement compare_exchange(&leader,nil,PaxosMyID)
 func (client *EtcdClient) tryBecomeLeader(ctx context.Context) uint64 {
 	cmp := clientv3.Compare(clientv3.CreateRevision("leader"), "=", 0)
-	put := clientv3.OpPut("leader", strconv.FormatUint(uint64(config.PaxosMyID), 10), clientv3.WithLease(client.leaseID))
+	put := clientv3.OpPut("leader", strconv.FormatUint(uint64(config.MyPeerID), 10), clientv3.WithLease(client.leaseID))
 	get := clientv3.OpGet("leader")
 	res, err := client.client.Txn(ctx).If(cmp).Then(put).Else(get).Commit()
 	if err != nil {
@@ -180,7 +194,7 @@ func (client *EtcdClient) tryBecomeLeader(ctx context.Context) uint64 {
 	}
 	rangeRes := res.Responses[0].GetResponseRange()
 	if rangeRes == nil {
-		return config.PaxosMyID
+		return config.MyPeerID
 	} else {
 		leader, _ := strconv.Atoi(string(rangeRes.Kvs[0].Value))
 		return uint64(leader)

@@ -11,30 +11,45 @@ import (
 	"server/util"
 )
 
+// various configuration values needed across the program, some obtained from command line argument and some from the etcd server
 var (
-	EtcdListenAddress     string        = "127.0.0.1:2379"
-	PaxosMyID             uint64        = 0
-	PaxosMemberCount      uint64        = 0
-	PaxosMaxReqPerRound   uint64        = 0
-	PaxosCleanupThreshold uint64        = 0
-	PaxosRetryDelay       time.Duration = time.Duration(0)
-	PaxosArtificialDelay  time.Duration = time.Duration(0)
-	PaxosMyIDStr          string        = ""
-	PaxosListenAddress    string        = ""
-	HTTPListenAddress     string        = ""
-	EtcdLeaseTTL          int64         = 0
-	Recover               bool          = false
-	Verbose               bool          = false
+	// the address of the etcd server
+	EtcdListenAddress string = "127.0.0.1:2379"
+	// the peer ID of this server
+	MyPeerID uint64 = 0
+	// amount of servers participating in the Paxos algorithm
+	PaxosMemberCount uint64 = 0
+	// amount of requests that may be commited in a paxos instance
+	PaxosMaxReqPerRound uint64 = 0
+	// how many already commited Paxos instances to keep before trying active log compaction
+	PaxosCleanupThreshold uint64 = 0
+	// how much time to wait before retrying a failed request
+	PaxosRetryDelay time.Duration = time.Duration(0)
+	// artificial delay to add to any gRPC request for testing purposes
+	PaxosArtificialDelay time.Duration = time.Duration(0)
+	// MyPeerID but string
+	MyPeerIDStr string = ""
+	// the address to run the gRPC server on
+	PaxosListenAddress string = ""
+	// the address to run the HTTP server on
+	HTTPListenAddress string = ""
+	// TTL for the etcd lease
+	EtcdLeaseTTL int64 = 0
+	// whether to recover the state of the database(otherwise start from scratch)
+	Recover bool = false
+	// whether to output verbose(Debug level) output(otherwise Info level)
+	Verbose bool = false
 )
 
+// SetupConf parses the command line arguments given to the program
 func SetupConf() {
-	paxosID := flag.Int("id", -1, "paxos ID for this server, must be unique across the cluster")
+	paxosID := flag.Int("id", -1, "peer ID for this server, must be unique across the cluster")
 	flag.BoolVar(&Verbose, "v", false, "verbose output, activates debug level logging")
 	flag.BoolVar(&Recover, "recover", false, "Perform state recovery")
 	flag.Parse()
 	if *paxosID < 0 {
 		util.SlogPanic("a non-negative --id <paxos id> is required")
 	}
-	PaxosMyID = uint64(*paxosID)
-	PaxosMyIDStr = strconv.FormatUint(PaxosMyID, 10)
+	MyPeerID = uint64(*paxosID)
+	MyPeerIDStr = strconv.FormatUint(MyPeerID, 10)
 }

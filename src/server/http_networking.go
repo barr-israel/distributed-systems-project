@@ -14,16 +14,34 @@ import (
 
 type HTTPServer struct{}
 
+// StartHTTPServer starts the http server
 func StartHTTPServer(paxosServer *paxos.PaxosServerState) {
 	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) { requestHandler(paxosServer, writer, request) })
 	http.HandleFunc("/list", func(writer http.ResponseWriter, request *http.Request) { listHandler(paxosServer, writer, request) })
-	go serverHTTP()
+	go serveHTTP()
 }
 
-func serverHTTP() {
+func serveHTTP() {
 	util.SlogPanic(http.ListenAndServe(config.HTTPListenAddress, nil).Error())
 }
 
+func requestHandler(paxosServer *paxos.PaxosServerState, writer http.ResponseWriter, request *http.Request) {
+	switch request.Method {
+	case "":
+		fallthrough
+	case "GET":
+		handleGet(request, paxosServer, writer)
+	case "PUT":
+		handlePut(request, paxosServer, writer)
+	case "DELETE":
+		handleDelete(request, paxosServer, writer)
+	}
+}
+
+// HTTP GET /list endpoint, returns a list of keys and their revisions
+// Available Headers:
+// Linearized - whether the call should be linearized(otherwise sequentially consistent)
+// Omit-Deleted - whether the list should omit deleted entries(otherwise include them)
 func listHandler(paxosServer *paxos.PaxosServerState, writer http.ResponseWriter, request *http.Request) {
 	slog.Info("Received HTTP GET /list", slog.String("Headers", fmt.Sprint(request.Header)))
 	if request.Method != "GET" {
@@ -41,7 +59,7 @@ func listHandler(paxosServer *paxos.PaxosServerState, writer http.ResponseWriter
 	}
 	var keyrevs []*paxos.KeyRev
 	if linearized {
-		keyrevs = paxosServer.ListKeysLinearized(context.Background(), omitDeleted)
+		keyrevs = paxosServer.LinearizedListKeys(context.Background(), omitDeleted)
 	} else {
 		keyrevs = paxosServer.ListKeys(context.Background(), omitDeleted)
 	}
@@ -64,19 +82,11 @@ func listHandler(paxosServer *paxos.PaxosServerState, writer http.ResponseWriter
 	}
 }
 
-func requestHandler(paxosServer *paxos.PaxosServerState, writer http.ResponseWriter, request *http.Request) {
-	switch request.Method {
-	case "":
-		fallthrough
-	case "GET":
-		handleGet(request, paxosServer, writer)
-	case "PUT":
-		handlePut(request, paxosServer, writer)
-	case "DELETE":
-		handleDelete(request, paxosServer, writer)
-	}
-}
-
+// HTTP GET endpoint, returns a value and a revision for a given key
+// Available Headers:
+// key (REQUIRED) - the key of the value and revision to return
+// Linearized - whether the call should be linearized(otherwise sequentially consistent)
+// Revision-Only - whether to only return the revision and not include the value
 func handleGet(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter) {
 	slog.Info("Received HTTP GET", slog.String("Headers", fmt.Sprint(request.Header)))
 	key := request.Header.Get("key")
@@ -119,17 +129,30 @@ func handleGet(request *http.Request, paxosServer *paxos.PaxosServerState, write
 	}
 }
 
+// HTTP PUT endpoint, conditionally write a given key value pair into the database
+// Available Headers:
+// key (REQUIRED) - the key to write
+// value (REQUIRED) - the value to write
+// revision - if supplied, the write will only be applied if it matches the current revision of the key
+// Async - if supplied, this endpoint will reply immediately without feedback and the write will be performed asynchronously
 func handlePut(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter) {
 	slog.Info("Received HTTP PUT", slog.String("Headers", fmt.Sprint(request.Header)))
 	value := request.Header.Get("value")
 	handleWrite(request, paxosServer, writer, &value)
 }
 
+// HTTP DELETE endpoint, conditionally delete a given key value pair from the database
+// A deleted key is still present in the database, but with no value.
+// Available Headers:
+// key (REQUIRED) - the key to write
+// revision - if supplied, the delete will only be applied if it matches the current revision of the key
+// Async - if supplied, this endpoint will reply immediately without feedback and the delete will be performed asynchronously
 func handleDelete(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter) {
 	slog.Info("Received HTTP DELETE", slog.String("Headers", fmt.Sprint(request.Header)))
 	handleWrite(request, paxosServer, writer, nil)
 }
 
+// combined implementation for the PUT and DELETE endpoints
 func handleWrite(request *http.Request, paxosServer *paxos.PaxosServerState, writer http.ResponseWriter, value *string) {
 	_, async := request.Header["Async"]
 	key := request.Header.Get("key")
