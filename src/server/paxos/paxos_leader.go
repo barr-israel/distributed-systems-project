@@ -21,7 +21,7 @@ func (server *PaxosServerState) sendPrepare(ctx context.Context, peerID uint64, 
 			return
 		}
 		slog.Error("Error sending prepare to peer, retrying:", slog.Uint64("peer ID", uint64(peerID)), slog.String("error", err.Error()))
-		time.Sleep(config.PaxosRetry * time.Millisecond)
+		time.Sleep(config.PaxosRetryDelay)
 		res, err = peer.Prepare(context.Background(), msg)
 	}
 	slog.Debug("Received prepare response", slog.Uint64("PeerID", uint64(peerID)), slog.String("promise", res.String()))
@@ -38,7 +38,7 @@ func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, m
 			return
 		}
 		slog.Error("Error sending accept to peer, retrying:", slog.Uint64("peer ID", uint64(peerID)), slog.String("error", err.Error()))
-		time.Sleep(config.PaxosRetry * time.Millisecond)
+		time.Sleep(config.PaxosRetryDelay)
 		res, err = peer.Accept(ctx, msg)
 	}
 	slog.Debug("Received accept response", slog.Uint64("PeerID", uint64(peerID)), slog.String("response", res.String()))

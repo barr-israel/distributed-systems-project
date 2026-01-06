@@ -40,7 +40,7 @@ func (server *PaxosServerState) sendAccepted(peerID uint64, msg *AcceptedMessage
 	_, err := peer.Accepted(context.Background(), msg)
 	for err != nil {
 		slog.Error("Error sending accepted to peer, retrying:", slog.Uint64("peer ID", uint64(peerID)), slog.String("error", err.Error()))
-		time.Sleep(config.PaxosRetry * time.Millisecond)
+		time.Sleep(config.PaxosRetryDelay)
 		_, err = peer.Accepted(context.Background(), msg)
 	}
 	slog.Debug("Received accepted response", slog.Uint64("PeerID", uint64(peerID)))
@@ -52,7 +52,7 @@ func (server *PaxosServerState) sendCommitedIDRequest(peerID uint64, responses c
 	res, err := peer.GetCommitedPaxosID(server.ctx, &emptypb.Empty{})
 	for err != nil {
 		slog.Error("Error sending min ID request to peer, retrying:", slog.Uint64("peer ID", uint64(peerID)), slog.String("error", err.Error()))
-		time.Sleep(config.PaxosRetry * time.Millisecond)
+		time.Sleep(config.PaxosRetryDelay)
 		res, err = peer.GetCommitedPaxosID(server.ctx, &emptypb.Empty{})
 	}
 	slog.Debug("Received min ID request response", slog.Uint64("PeerID", uint64(peerID)), slog.String("response", res.String()))
@@ -60,6 +60,7 @@ func (server *PaxosServerState) sendCommitedIDRequest(peerID uint64, responses c
 }
 
 func (server *PaxosServerState) Prepare(ctx context.Context, msg *PrepareMessage) (*PromiseMessage, error) {
+	time.Sleep(config.PaxosArtificialDelay)
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	slog.Debug("Received prepare", slog.String("msg", msg.String()))
@@ -73,6 +74,7 @@ func (server *PaxosServerState) Prepare(ctx context.Context, msg *PrepareMessage
 }
 
 func (server *PaxosServerState) Accept(ctx context.Context, msg *AcceptMessage) (*AcceptResponse, error) {
+	time.Sleep(config.PaxosArtificialDelay)
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	slog.Debug("Received accept", slog.String("msg", msg.String()))
@@ -92,6 +94,7 @@ func (server *PaxosServerState) Accept(ctx context.Context, msg *AcceptMessage) 
 }
 
 func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessage) (*emptypb.Empty, error) {
+	time.Sleep(config.PaxosArtificialDelay)
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	slog.Debug("Received accepted", slog.String("msg", msg.String()))
@@ -117,6 +120,7 @@ func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessa
 }
 
 func (server *PaxosServerState) FillInProposal(ctx context.Context, msg *FillInProposalMessage) (*Proposal, error) {
+	time.Sleep(config.PaxosArtificialDelay)
 	slog.Debug("Received Fill In Request", slog.Uint64("Paxos ID", msg.PaxosId), slog.Uint64("round", msg.Round))
 	// no lock required because we are not writing,
 	// and we will get this request only if we sent this peer an "ACCEPTED",
@@ -131,6 +135,7 @@ func (server *PaxosServerState) FillInProposal(ctx context.Context, msg *FillInP
 }
 
 func (server *PaxosServerState) GetCommitedPaxosID(ctx context.Context, _ *emptypb.Empty) (*CommitedPaxosID, error) {
+	time.Sleep(config.PaxosArtificialDelay)
 	return &CommitedPaxosID{CommitedPaxosId: server.commitedPaxosID}, nil
 }
 

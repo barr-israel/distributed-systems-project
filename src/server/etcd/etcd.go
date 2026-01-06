@@ -78,8 +78,9 @@ func readConfig(client *clientv3.Client) {
 	config.PaxosMemberCount = readInt(client, "paxos_member_count")
 	config.PaxosMaxReqPerRound = readInt(client, "paxos_max_req_per_round")
 	config.PaxosCleanupThreshold = readInt(client, "paxos_cleanup_threshold")
-	config.PaxosRetry = time.Duration(int64(readInt(client, "paxos_retry_milliseconds")))
+	config.PaxosRetryDelay = time.Duration(int64(readInt(client, "paxos_retry_milliseconds"))) * time.Millisecond
 	config.EtcdLeaseTTL = int64(readInt(client, "etcd_lease_ttl_seconds"))
+	config.PaxosArtificialDelay = time.Duration(int64(readInt(client, "paxos_artificial_delay_milliseconds"))) * time.Millisecond
 }
 
 func (client *EtcdClient) PublishReady() {

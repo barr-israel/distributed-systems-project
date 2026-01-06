@@ -17,7 +17,8 @@ var (
 	PaxosMemberCount      uint64        = 0
 	PaxosMaxReqPerRound   uint64        = 0
 	PaxosCleanupThreshold uint64        = 0
-	PaxosRetry            time.Duration = time.Duration(0)
+	PaxosRetryDelay       time.Duration = time.Duration(0)
+	PaxosArtificialDelay  time.Duration = time.Duration(0)
 	PaxosMyIDStr          string        = ""
 	PaxosListenAddress    string        = ""
 	HTTPListenAddress     string        = ""
