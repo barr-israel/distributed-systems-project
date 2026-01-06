@@ -5,6 +5,7 @@ package paxos
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -91,7 +92,6 @@ func (server *PaxosServerState) Accept(ctx context.Context, msg *AcceptMessage) 
 }
 
 func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessage) (*emptypb.Empty, error) {
-	// TODO: add proposal fill-in
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	slog.Debug("Received accepted", slog.String("msg", msg.String()))
@@ -100,10 +100,34 @@ func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessa
 	}
 	p := server.getOrCreatePaxosInstance(msg.PaxosId)
 	commit := p.Accepted(msg)
+	if p.missingProposal(msg.Round) {
+		slog.Debug("Trying to fill in")
+		res, err := server.peers[msg.SenderId].FillInProposal(ctx, &FillInProposalMessage{PaxosId: msg.PaxosId, Round: msg.Round})
+		if err == nil {
+			slog.Debug("Fill in successful")
+			p.FillInProposal(msg.Round, res)
+		} else {
+			slog.Warn("Fill in failed", slog.String("error", err.Error()))
+		}
+	}
 	if commit {
 		server.tryCommitPaxos()
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (server *PaxosServerState) FillInProposal(ctx context.Context, msg *FillInProposalMessage) (*Proposal, error) {
+	slog.Debug("Received Fill In Request", slog.Uint64("Paxos ID", msg.PaxosId), slog.Uint64("round", msg.Round))
+	// no lock required because we are not writing,
+	// and we will get this request only if we sent this peer an "ACCEPTED",
+	// so we should have this proposal set for this round unless we crashed.
+	// Additionally, this request only arrives we are still waiting for this peer to acknowledge our "ACCEPTED", so locking here will cause a dead-lock
+	proposal, exists := server.ongoingPaxos[msg.PaxosId]
+	if !exists {
+		// possible if we just recovered from a crash
+		return nil, errors.New("requested paxos ID not found")
+	}
+	return proposal.getActionsForRound(msg.Round)
 }
 
 func (server *PaxosServerState) GetCommitedPaxosID(ctx context.Context, _ *emptypb.Empty) (*CommitedPaxosID, error) {
@@ -114,7 +138,7 @@ func (server *PaxosServerState) tryCommitPaxos() {
 	paxos := server.ongoingPaxos[server.commitedPaxosID+1]
 	for paxos != nil && paxos.decided {
 		server.commitedPaxosID++
-		server.commitActions(*paxos.preference, server.commitedPaxosID)
+		server.commitActions(paxos.getDecidedValue(), server.commitedPaxosID)
 		slog.Info("Commited paxos:", slog.Uint64("paxosID", server.commitedPaxosID), slog.Any("actions", paxos.proposals))
 		if paxos.done {
 			server.deletePaxos(server.commitedPaxosID)
@@ -144,9 +168,9 @@ func (server *PaxosServerState) cleanUpOldPaxos() {
 	}
 }
 
-func (server *PaxosServerState) commitActions(actionLocal []ActionLocal, paxosID uint64) {
+func (server *PaxosServerState) commitActions(actionLocal *[]ActionLocal, paxosID uint64) {
 	activeRequestsCount := len(server.activeWrites)
-	for _, action := range actionLocal {
+	for _, action := range *actionLocal {
 		entry, exists := server.data[action.key]
 		slog.Debug("Commiting action with", slog.String("key", action.key))
 		success := false
@@ -184,11 +208,11 @@ func (server *PaxosServerState) commitActions(actionLocal []ActionLocal, paxosID
 					activeRequestsCount--
 				}
 			}
+			// only keep unfulfilled requests
+			server.activeWrites = server.activeWrites[:activeRequestsCount]
+			slog.Debug("remaining", slog.Int("requests", len(server.activeWrites)))
 		}
 	}
-	// only keep unfulfilled requests
-	server.activeWrites = server.activeWrites[:activeRequestsCount]
-	slog.Debug("remaining", slog.Int("requests", len(server.activeWrites)))
 }
 
 func (server *PaxosServerState) deletePaxos(paxosID uint64) {

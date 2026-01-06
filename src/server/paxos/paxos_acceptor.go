@@ -1,6 +1,9 @@
 package paxos
 
 import (
+	"errors"
+	"log/slog"
+
 	"server/config"
 )
 
@@ -53,9 +56,32 @@ type PaxosInstance struct {
 	lastGoodRound    uint64
 	decided          bool
 	done             bool
-	preference       *[]ActionLocal
+	preference       uint64
 	proposals        []*[]ActionLocal
 	acceptedReceived []uint64
+}
+
+func (p *PaxosInstance) getDecidedValue() *[]ActionLocal {
+	return p.proposals[p.preference]
+}
+
+func (p *PaxosInstance) getActionsForRound(round uint64) (*Proposal, error) {
+	if int(round) >= len(p.proposals) {
+		return nil, errors.New("requested round not found")
+	}
+	proposal := p.proposals[round]
+	if proposal == nil {
+		return nil, errors.New("requested round not found")
+	}
+	return &Proposal{Actions: toActionArray(proposal)}, nil
+}
+
+func (p *PaxosInstance) FillInProposal(round uint64, res *Proposal) {
+	p.proposals[round] = toActionLocalArray(&res.Actions)
+}
+
+func (p *PaxosInstance) missingProposal(round uint64) bool {
+	return p.proposals[round] == nil && round == p.preference
 }
 
 func (p *PaxosInstance) extendBuffersTo(size int) {
@@ -81,7 +107,7 @@ func (p *PaxosInstance) extendBuffersTo(size int) {
 func (p *PaxosInstance) Prepare(msg *PrepareMessage) *PromiseMessage {
 	if msg.Round > p.lastRound && !p.decided {
 		p.lastRound = msg.Round
-		actions := toActionArray(p.preference)
+		actions := toActionArray(p.proposals[p.preference])
 		return &PromiseMessage{LastGoodRound: p.lastGoodRound, Ack: true, Proposal: &Proposal{Actions: actions}}
 	} else {
 		return &PromiseMessage{LastGoodRound: p.lastGoodRound, Ack: false, Proposal: nil}
@@ -94,11 +120,11 @@ func (p *PaxosInstance) Accept(msg *AcceptMessage) (*AcceptedMessage, bool) {
 		p.lastRound = msg.Round
 		p.lastGoodRound = msg.Round
 		p.extendBuffersTo(int(msg.Round) + 1)
-		p.acceptedReceived[msg.Round] = 0
-		actions := toActionLocalArray(&msg.Proposal.Actions)
-		p.proposals[msg.Round] = actions
-		p.preference = actions
-		return &AcceptedMessage{PaxosId: msg.PaxosId, Round: msg.Round, Proposal: msg.Proposal}, true
+		if p.missingProposal(msg.Round) {
+			p.proposals[msg.Round] = toActionLocalArray(&msg.Proposal.Actions)
+		}
+		p.preference = msg.Round
+		return &AcceptedMessage{PaxosId: msg.PaxosId, Round: msg.Round, SenderId: config.PaxosMyID}, true
 	}
 	return nil, false
 }
@@ -110,15 +136,14 @@ func (p *PaxosInstance) Accepted(msg *AcceptedMessage) bool {
 	commit := !p.decided && pastThreshold
 	if commit {
 		p.decided = true
-		p.preference = p.proposals[msg.Round]
+		p.preference = msg.Round
 	}
+	slog.Debug("Accepted received for this round", slog.Uint64("count", p.acceptedReceived[msg.Round]))
 	p.done = p.done || p.acceptedReceived[msg.Round] == config.PaxosMemberCount
 	return commit
 }
 
 func NewPaxosInstance() *PaxosInstance {
 	proposals := make([]*[]ActionLocal, 2)
-	actions := make([]ActionLocal, 0)
-	proposals[1] = &actions
-	return &PaxosInstance{proposals: proposals, preference: &actions}
+	return &PaxosInstance{proposals: proposals, preference: 1}
 }

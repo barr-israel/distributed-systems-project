@@ -48,6 +48,7 @@ func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, m
 func (server *PaxosServerState) tryFastPaxos(paxosID uint64) bool {
 	req := <-server.incomingRequests
 	// must wait for the first request to grab the lock
+	slog.Debug("Trying Fast Paxos for", slog.Uint64("Paxos ID", paxosID))
 	server.leaderLock.Lock()
 	server.activeWrites = append(server.activeWrites, req)
 	for len(server.incomingRequests) != 0 {
@@ -81,7 +82,6 @@ func (server *PaxosServerState) tryFastPaxos(paxosID uint64) bool {
 func (server *PaxosServerState) runLeader() {
 	for {
 		thisPaxosID := server.commitedPaxosID + 1
-		slog.Debug("Trying Fast Paxos for", slog.Uint64("Paxos ID", thisPaxosID))
 		succeeded := server.tryFastPaxos(thisPaxosID)
 		if succeeded {
 			server.leaderLock.Unlock()

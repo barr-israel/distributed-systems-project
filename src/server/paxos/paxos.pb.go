@@ -539,7 +539,7 @@ type AcceptedMessage struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PaxosId       uint64                 `protobuf:"varint,1,opt,name=paxos_id,json=paxosId,proto3" json:"paxos_id,omitempty"`
 	Round         uint64                 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
-	Proposal      *Proposal              `protobuf:"bytes,3,opt,name=proposal,proto3" json:"proposal,omitempty"`
+	SenderId      uint64                 `protobuf:"varint,3,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -588,11 +588,11 @@ func (x *AcceptedMessage) GetRound() uint64 {
 	return 0
 }
 
-func (x *AcceptedMessage) GetProposal() *Proposal {
+func (x *AcceptedMessage) GetSenderId() uint64 {
 	if x != nil {
-		return x.Proposal
+		return x.SenderId
 	}
-	return nil
+	return 0
 }
 
 type PromotionReply struct {
@@ -891,6 +891,58 @@ func (x *ListRequest) GetOmitDeleted() bool {
 	return false
 }
 
+type FillInProposalMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PaxosId       uint64                 `protobuf:"varint,1,opt,name=paxos_id,json=paxosId,proto3" json:"paxos_id,omitempty"`
+	Round         uint64                 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FillInProposalMessage) Reset() {
+	*x = FillInProposalMessage{}
+	mi := &file_paxos_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FillInProposalMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FillInProposalMessage) ProtoMessage() {}
+
+func (x *FillInProposalMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_paxos_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FillInProposalMessage.ProtoReflect.Descriptor instead.
+func (*FillInProposalMessage) Descriptor() ([]byte, []int) {
+	return file_paxos_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *FillInProposalMessage) GetPaxosId() uint64 {
+	if x != nil {
+		return x.PaxosId
+	}
+	return 0
+}
+
+func (x *FillInProposalMessage) GetRound() uint64 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
 var File_paxos_proto protoreflect.FileDescriptor
 
 const file_paxos_proto_rawDesc = "" +
@@ -929,11 +981,11 @@ const file_paxos_proto_rawDesc = "" +
 	"\x05round\x18\x02 \x01(\x04R\x05round\x12%\n" +
 	"\bproposal\x18\x03 \x01(\v2\t.ProposalR\bproposal\"\"\n" +
 	"\x0eAcceptResponse\x12\x10\n" +
-	"\x03ack\x18\x01 \x01(\bR\x03ack\"i\n" +
+	"\x03ack\x18\x01 \x01(\bR\x03ack\"_\n" +
 	"\x0fAcceptedMessage\x12\x19\n" +
 	"\bpaxos_id\x18\x01 \x01(\x04R\apaxosId\x12\x14\n" +
-	"\x05round\x18\x02 \x01(\x04R\x05round\x12%\n" +
-	"\bproposal\x18\x03 \x01(\v2\t.ProposalR\bproposal\"(\n" +
+	"\x05round\x18\x02 \x01(\x04R\x05round\x12\x1b\n" +
+	"\tsender_id\x18\x03 \x01(\x04R\bsenderId\"(\n" +
 	"\x0ePromotionReply\x12\x16\n" +
 	"\x06leader\x18\x01 \x01(\x04R\x06leader\"\xa1\x01\n" +
 	"\x05State\x12*\n" +
@@ -952,7 +1004,10 @@ const file_paxos_proto_rawDesc = "" +
 	"\vKeyRevsList\x12!\n" +
 	"\akeyrevs\x18\x01 \x03(\v2\a.KeyRevR\akeyrevs\"/\n" +
 	"\vListRequest\x12 \n" +
-	"\vomitDeleted\x18\x01 \x01(\bR\vomitDeleted2\xa7\x04\n" +
+	"\vomitDeleted\x18\x01 \x01(\bR\vomitDeleted\"H\n" +
+	"\x15FillInProposalMessage\x12\x19\n" +
+	"\bpaxos_id\x18\x01 \x01(\x04R\apaxosId\x12\x14\n" +
+	"\x05round\x18\x02 \x01(\x04R\x05round2\xde\x04\n" +
 	"\x05Paxos\x12-\n" +
 	"\aPrepare\x12\x0f.PrepareMessage\x1a\x0f.PromiseMessage\"\x00\x12+\n" +
 	"\x06Accept\x12\x0e.AcceptMessage\x1a\x0f.AcceptResponse\"\x00\x126\n" +
@@ -964,7 +1019,8 @@ const file_paxos_proto_rawDesc = "" +
 	"\x12ReadListFromLeader\x12\f.ListRequest\x1a\f.KeyRevsList\"\x00\x12?\n" +
 	"\x12SuggestPromoteSelf\x12\x16.google.protobuf.Empty\x1a\x0f.PromotionReply\"\x00\x120\n" +
 	"\fRequestState\x12\x16.google.protobuf.Empty\x1a\x06.State\"\x00\x12@\n" +
-	"\x12GetCommitedPaxosID\x12\x16.google.protobuf.Empty\x1a\x10.CommitedPaxosID\"\x00B\tZ\a./paxosb\x06proto3"
+	"\x12GetCommitedPaxosID\x12\x16.google.protobuf.Empty\x1a\x10.CommitedPaxosID\"\x00\x125\n" +
+	"\x0eFillInProposal\x12\x16.FillInProposalMessage\x1a\t.Proposal\"\x00B\tZ\a./paxosb\x06proto3"
 
 var (
 	file_paxos_proto_rawDescOnce sync.Once
@@ -978,47 +1034,48 @@ func file_paxos_proto_rawDescGZIP() []byte {
 	return file_paxos_proto_rawDescData
 }
 
-var file_paxos_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_paxos_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
 var file_paxos_proto_goTypes = []any{
-	(*Action)(nil),             // 0: Action
-	(*Proposal)(nil),           // 1: Proposal
-	(*WriteReply)(nil),         // 2: WriteReply
-	(*ReadRequestMessage)(nil), // 3: ReadRequestMessage
-	(*ReadReply)(nil),          // 4: ReadReply
-	(*ReadRevisionReply)(nil),  // 5: ReadRevisionReply
-	(*PrepareMessage)(nil),     // 6: PrepareMessage
-	(*PromiseMessage)(nil),     // 7: PromiseMessage
-	(*AcceptMessage)(nil),      // 8: AcceptMessage
-	(*AcceptResponse)(nil),     // 9: AcceptResponse
-	(*AcceptedMessage)(nil),    // 10: AcceptedMessage
-	(*PromotionReply)(nil),     // 11: PromotionReply
-	(*State)(nil),              // 12: State
-	(*CommitedPaxosID)(nil),    // 13: CommitedPaxosID
-	(*KeyRev)(nil),             // 14: KeyRev
-	(*KeyRevsList)(nil),        // 15: KeyRevsList
-	(*ListRequest)(nil),        // 16: ListRequest
-	(*emptypb.Empty)(nil),      // 17: google.protobuf.Empty
+	(*Action)(nil),                // 0: Action
+	(*Proposal)(nil),              // 1: Proposal
+	(*WriteReply)(nil),            // 2: WriteReply
+	(*ReadRequestMessage)(nil),    // 3: ReadRequestMessage
+	(*ReadReply)(nil),             // 4: ReadReply
+	(*ReadRevisionReply)(nil),     // 5: ReadRevisionReply
+	(*PrepareMessage)(nil),        // 6: PrepareMessage
+	(*PromiseMessage)(nil),        // 7: PromiseMessage
+	(*AcceptMessage)(nil),         // 8: AcceptMessage
+	(*AcceptResponse)(nil),        // 9: AcceptResponse
+	(*AcceptedMessage)(nil),       // 10: AcceptedMessage
+	(*PromotionReply)(nil),        // 11: PromotionReply
+	(*State)(nil),                 // 12: State
+	(*CommitedPaxosID)(nil),       // 13: CommitedPaxosID
+	(*KeyRev)(nil),                // 14: KeyRev
+	(*KeyRevsList)(nil),           // 15: KeyRevsList
+	(*ListRequest)(nil),           // 16: ListRequest
+	(*FillInProposalMessage)(nil), // 17: FillInProposalMessage
+	(*emptypb.Empty)(nil),         // 18: google.protobuf.Empty
 }
 var file_paxos_proto_depIdxs = []int32{
 	0,  // 0: Proposal.actions:type_name -> Action
 	1,  // 1: PromiseMessage.proposal:type_name -> Proposal
 	1,  // 2: AcceptMessage.proposal:type_name -> Proposal
-	1,  // 3: AcceptedMessage.proposal:type_name -> Proposal
-	1,  // 4: State.data_state:type_name -> Proposal
-	14, // 5: KeyRevsList.keyrevs:type_name -> KeyRev
-	6,  // 6: Paxos.Prepare:input_type -> PrepareMessage
-	8,  // 7: Paxos.Accept:input_type -> AcceptMessage
-	10, // 8: Paxos.Accepted:input_type -> AcceptedMessage
-	0,  // 9: Paxos.WriteToLeader:input_type -> Action
-	3,  // 10: Paxos.ReadFromLeader:input_type -> ReadRequestMessage
-	3,  // 11: Paxos.ReadRevisionFromLeader:input_type -> ReadRequestMessage
-	16, // 12: Paxos.ReadListFromLeader:input_type -> ListRequest
-	17, // 13: Paxos.SuggestPromoteSelf:input_type -> google.protobuf.Empty
-	17, // 14: Paxos.RequestState:input_type -> google.protobuf.Empty
-	17, // 15: Paxos.GetCommitedPaxosID:input_type -> google.protobuf.Empty
+	1,  // 3: State.data_state:type_name -> Proposal
+	14, // 4: KeyRevsList.keyrevs:type_name -> KeyRev
+	6,  // 5: Paxos.Prepare:input_type -> PrepareMessage
+	8,  // 6: Paxos.Accept:input_type -> AcceptMessage
+	10, // 7: Paxos.Accepted:input_type -> AcceptedMessage
+	0,  // 8: Paxos.WriteToLeader:input_type -> Action
+	3,  // 9: Paxos.ReadFromLeader:input_type -> ReadRequestMessage
+	3,  // 10: Paxos.ReadRevisionFromLeader:input_type -> ReadRequestMessage
+	16, // 11: Paxos.ReadListFromLeader:input_type -> ListRequest
+	18, // 12: Paxos.SuggestPromoteSelf:input_type -> google.protobuf.Empty
+	18, // 13: Paxos.RequestState:input_type -> google.protobuf.Empty
+	18, // 14: Paxos.GetCommitedPaxosID:input_type -> google.protobuf.Empty
+	17, // 15: Paxos.FillInProposal:input_type -> FillInProposalMessage
 	7,  // 16: Paxos.Prepare:output_type -> PromiseMessage
 	9,  // 17: Paxos.Accept:output_type -> AcceptResponse
-	17, // 18: Paxos.Accepted:output_type -> google.protobuf.Empty
+	18, // 18: Paxos.Accepted:output_type -> google.protobuf.Empty
 	2,  // 19: Paxos.WriteToLeader:output_type -> WriteReply
 	4,  // 20: Paxos.ReadFromLeader:output_type -> ReadReply
 	5,  // 21: Paxos.ReadRevisionFromLeader:output_type -> ReadRevisionReply
@@ -1026,11 +1083,12 @@ var file_paxos_proto_depIdxs = []int32{
 	11, // 23: Paxos.SuggestPromoteSelf:output_type -> PromotionReply
 	12, // 24: Paxos.RequestState:output_type -> State
 	13, // 25: Paxos.GetCommitedPaxosID:output_type -> CommitedPaxosID
-	16, // [16:26] is the sub-list for method output_type
-	6,  // [6:16] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	1,  // 26: Paxos.FillInProposal:output_type -> Proposal
+	16, // [16:27] is the sub-list for method output_type
+	5,  // [5:16] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_paxos_proto_init() }
@@ -1047,7 +1105,7 @@ func file_paxos_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_paxos_proto_rawDesc), len(file_paxos_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   18,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

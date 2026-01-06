@@ -30,6 +30,7 @@ const (
 	Paxos_SuggestPromoteSelf_FullMethodName     = "/Paxos/SuggestPromoteSelf"
 	Paxos_RequestState_FullMethodName           = "/Paxos/RequestState"
 	Paxos_GetCommitedPaxosID_FullMethodName     = "/Paxos/GetCommitedPaxosID"
+	Paxos_FillInProposal_FullMethodName         = "/Paxos/FillInProposal"
 )
 
 // PaxosClient is the client API for Paxos service.
@@ -46,6 +47,7 @@ type PaxosClient interface {
 	SuggestPromoteSelf(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*PromotionReply, error)
 	RequestState(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*State, error)
 	GetCommitedPaxosID(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*CommitedPaxosID, error)
+	FillInProposal(ctx context.Context, in *FillInProposalMessage, opts ...grpc.CallOption) (*Proposal, error)
 }
 
 type paxosClient struct {
@@ -156,6 +158,16 @@ func (c *paxosClient) GetCommitedPaxosID(ctx context.Context, in *emptypb.Empty,
 	return out, nil
 }
 
+func (c *paxosClient) FillInProposal(ctx context.Context, in *FillInProposalMessage, opts ...grpc.CallOption) (*Proposal, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Proposal)
+	err := c.cc.Invoke(ctx, Paxos_FillInProposal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // PaxosServer is the server API for Paxos service.
 // All implementations must embed UnimplementedPaxosServer
 // for forward compatibility.
@@ -170,6 +182,7 @@ type PaxosServer interface {
 	SuggestPromoteSelf(context.Context, *emptypb.Empty) (*PromotionReply, error)
 	RequestState(context.Context, *emptypb.Empty) (*State, error)
 	GetCommitedPaxosID(context.Context, *emptypb.Empty) (*CommitedPaxosID, error)
+	FillInProposal(context.Context, *FillInProposalMessage) (*Proposal, error)
 	mustEmbedUnimplementedPaxosServer()
 }
 
@@ -209,6 +222,9 @@ func (UnimplementedPaxosServer) RequestState(context.Context, *emptypb.Empty) (*
 }
 func (UnimplementedPaxosServer) GetCommitedPaxosID(context.Context, *emptypb.Empty) (*CommitedPaxosID, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetCommitedPaxosID not implemented")
+}
+func (UnimplementedPaxosServer) FillInProposal(context.Context, *FillInProposalMessage) (*Proposal, error) {
+	return nil, status.Error(codes.Unimplemented, "method FillInProposal not implemented")
 }
 func (UnimplementedPaxosServer) mustEmbedUnimplementedPaxosServer() {}
 func (UnimplementedPaxosServer) testEmbeddedByValue()               {}
@@ -411,6 +427,24 @@ func _Paxos_GetCommitedPaxosID_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Paxos_FillInProposal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FillInProposalMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PaxosServer).FillInProposal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Paxos_FillInProposal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PaxosServer).FillInProposal(ctx, req.(*FillInProposalMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Paxos_ServiceDesc is the grpc.ServiceDesc for Paxos service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -457,6 +491,10 @@ var Paxos_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetCommitedPaxosID",
 			Handler:    _Paxos_GetCommitedPaxosID_Handler,
+		},
+		{
+			MethodName: "FillInProposal",
+			Handler:    _Paxos_FillInProposal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

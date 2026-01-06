@@ -55,7 +55,7 @@ message AcceptResponse{
 message AcceptedMessage{
   uint64 paxos_id = 1;
   uint64 round = 2;
-  Proposal proposal = 3;
+  uint64 sender_id = 3;
 }
 
 message PromotionReply{
@@ -86,6 +86,11 @@ message ListRequest{
   bool omitDeleted = 1;
 }
 
+message FillInProposalMessage{
+  uint64 paxos_id = 1;
+  uint64 round = 2;
+}
+
 service Paxos{
   rpc Prepare(PrepareMessage) returns (PromiseMessage) {}
   rpc Accept(AcceptMessage) returns (AcceptResponse){}
@@ -97,4 +102,5 @@ service Paxos{
   rpc SuggestPromoteSelf(google.protobuf.Empty) returns (PromotionReply){}
   rpc RequestState(google.protobuf.Empty) returns (State){}
   rpc GetCommitedPaxosID(google.protobuf.Empty) returns (CommitedPaxosID){}
+  rpc FillInProposal(FillInProposalMessage) returns (Proposal){}
 }
