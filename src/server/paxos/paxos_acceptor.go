@@ -114,7 +114,12 @@ func (p *PaxosInstance) extendBuffersTo(size int) {
 func (p *PaxosInstance) Prepare(msg *PrepareMessage) *PromiseMessage {
 	if msg.Round > p.lastRound && !p.decided {
 		p.lastRound = msg.Round
-		actions := toActionArray(p.proposals[p.preference])
+		var actions []*Action
+		if p.proposals[msg.Round] != nil {
+			actions = toActionArray(p.proposals[p.preference])
+		} else {
+			actions = []*Action{}
+		}
 		return &PromiseMessage{LastGoodRound: p.lastGoodRound, Ack: true, Proposal: &Proposal{Actions: actions}}
 	} else {
 		return &PromiseMessage{LastGoodRound: p.lastGoodRound, Ack: false, Proposal: nil}

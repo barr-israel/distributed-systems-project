@@ -49,56 +49,26 @@ func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, m
 	responses <- res
 }
 
-// before running the full paxos leader algorithm, try to immediately send ACCEPT to all the acceptors
-// if this is the first leader for this Paxos ID, this will succeed
-func (server *PaxosServerState) tryFastPaxos(paxosID uint64) bool {
+// fill the activeWrites buffer from the incomingRequests channel before starting a Paxos instance
+func (server *PaxosServerState) fillActiveWrites() {
 	req := <-server.incomingRequests
-	// must wait for the first request to grab the lock
-	slog.Debug("Trying Fast Paxos for", slog.Uint64("Paxos ID", paxosID))
+	// only lock after a request has arrived to prevent holding the lock unnecessarily
 	server.leaderLock.Lock()
 	server.activeWrites = append(server.activeWrites, req)
 	for len(server.incomingRequests) != 0 && len(server.activeWrites) < int(config.PaxosMaxReqPerRound) {
 		req := <-server.incomingRequests
 		server.activeWrites = append(server.activeWrites, req)
 	}
-	proposal := reqsToActionArray(&server.activeWrites)
-	msg := AcceptMessage{PaxosId: paxosID, Round: 1, Proposal: &Proposal{Actions: proposal}}
-	responses := make(chan *AcceptResponse, config.PaxosMemberCount)
-	for peerID := range config.PaxosMemberCount {
-		go server.sendAccept(context.Background(), peerID, &msg, responses)
-	}
-	acceptAckCount := uint64(0)
-	acceptNAckCount := uint64(0)
-	for acceptNAckCount < config.PaxosMemberCount/2 {
-		res := <-responses
-		if res.Ack {
-			acceptAckCount++
-			if acceptAckCount > config.PaxosMemberCount/2 {
-				slog.Info("Leader completed paxos", slog.Uint64("Paxos ID", paxosID))
-				// not cancelling the context here because the accept messages are still useful to spread
-				return true
-			}
-		} else {
-			acceptNAckCount++
-		}
-	}
-	return false
 }
 
 // run the leader Paxos algorithm as long as this peer is the leader
 func (server *PaxosServerState) runLeader() {
 	for {
 		thisPaxosID := server.commitedPaxosID + 1
-		succeeded := server.tryFastPaxos(thisPaxosID)
-		if succeeded {
-			server.leaderLock.Unlock()
-			// the leader must wait for the acceptor that is on the same peer to commit this Paxos instance before continuing to the next
-			server.waitForCommit(thisPaxosID)
-			continue
-		}
-		slog.Debug("Fast Paxos failed, falling back to normal")
-		round := uint64(2)
-		preference := make([]*Action, 0)
+		server.fillActiveWrites()
+		slog.Debug("Leader starting Paxos", slog.Uint64("Paxos ID", thisPaxosID))
+		round := uint64(1)
+		preference := reqsToActionArray(&server.activeWrites)
 	PaxosInstance:
 		for {
 			msg := PrepareMessage{PaxosId: thisPaxosID, Round: round}
@@ -117,6 +87,7 @@ func (server *PaxosServerState) runLeader() {
 				if res.Ack {
 					prepareAckCount++
 					if res.LastGoodRound > largestReceivedAckRound {
+						// adopt proposal from acceptor
 						largestReceivedAckRound = res.LastGoodRound
 						preference = res.Proposal.Actions
 					}
@@ -148,7 +119,6 @@ func (server *PaxosServerState) runLeader() {
 					prepareNAckCount++
 				}
 			}
-			// any message about this round is useless at this point
 			// skip ahead of every peer
 			round = max(round, largestReceivedRound) + 1
 			server.refreshLeader(context.Background())

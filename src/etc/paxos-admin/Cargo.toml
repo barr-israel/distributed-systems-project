@@ -1,0 +1,9 @@
+[package]
+name = "paxos-admin"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ratatui = {version="0.30.0", default-features = false, features = ["crossterm","std","layout-cache"]}
+reqwest = { version = "0.13.1", default-features = false, features=["json","charset","blocking"] }
+serde = { version = "1.0.228", default-features = false, features=["std","derive"] }

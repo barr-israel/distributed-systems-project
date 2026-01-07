@@ -10,9 +10,7 @@ use ratatui::{
     layout::{Constraint, Flex, Layout, Rect},
     style::{Color, Stylize},
     text::{Line, Span, ToSpan},
-    widgets::{
-        Block, Clear, List, ListItem, ListState, Paragraph, StatefulWidget, Tabs, Widget, Wrap,
-    },
+    widgets::{Block, Clear, List, ListItem, ListState, Paragraph, StatefulWidget, Widget, Wrap},
 };
 use serde::Deserialize;
 
@@ -38,16 +36,14 @@ pub struct Document {
 enum Mode {
     Normal,
     Insert,
-    Admin,
 }
 impl Mode {
     fn to_keybinds(&self) -> &str {
         match self {
             Mode::Normal => {
-                "q-quit,r-reload document,Up-previous document,Down-next document,i-enter insert mode,Tab-enter admin mode,s-save,S-force save,d-delete,D-force delete,a-add,A-force add"
+                "q-quit,r-reload document,Up-previous document,Down-next document,i-enter insert mode,s-save,S-force save,d-delete,D-force delete,a-add,A-force add"
             }
             Mode::Insert => "esc - exit insert mode",
-            Mode::Admin => todo!(),
         }
     }
 }
@@ -57,7 +53,6 @@ impl ToSpan for Mode {
         match self {
             Mode::Normal => "NORMAL".to_span(),
             Mode::Insert => "INSERT".to_span().bg(Color::White).fg(Color::Black),
-            Mode::Admin => "ADMIN".to_span(),
         }
     }
 }
@@ -166,12 +161,10 @@ impl CrabDocsApp {
             terminal.draw(|frame: &mut Frame| {
                 frame.render_widget(&mut self, frame.area());
                 if self.prompt_input.is_some() {
-                    let area = popup_area(frame.area(), 40, 11);
-                    self.render_prompt(area, frame.buffer_mut());
+                    self.render_prompt(frame);
                 }
                 if self.popup_text.is_some() {
-                    let area = popup_area(frame.area(), 40, 10);
-                    self.render_popup(area, frame.buffer_mut());
+                    self.render_popup(frame);
                 }
             })?;
             loop {
@@ -192,10 +185,14 @@ impl CrabDocsApp {
                             KeyCode::Enter => self.submit_addition(),
                             KeyCode::Esc => self.prompt_input = None,
                             KeyCode::Backspace => {
-                                self.prompt_input.as_mut().unwrap().pop();
+                                let buf = self.prompt_input.as_mut().unwrap();
+                                if buf.len() > BLOCK_ASCII.len_utf8() {
+                                    buf.remove(buf.len() - BLOCK_ASCII.len_utf8() - 1);
+                                }
                             }
                             KeyCode::Char(c) => {
-                                self.prompt_input.as_mut().unwrap().push(c);
+                                let buf = self.prompt_input.as_mut().unwrap();
+                                buf.insert(buf.len() - BLOCK_ASCII.len_utf8(), c);
                             }
                             _ => {}
                         }
@@ -211,7 +208,6 @@ impl CrabDocsApp {
                             Mode::Insert => {
                                 self.insert_mode_event(code);
                             }
-                            Mode::Admin => self.admin_mode_event(code),
                         }
                     }
                     self.refresh_data(false);
@@ -222,10 +218,6 @@ impl CrabDocsApp {
                 }
             }
         }
-    }
-
-    fn render_admin(&mut self, remainder: Rect, buf: &mut Buffer) {
-        todo!()
     }
 
     fn render_user(&mut self, remainder: Rect, buf: &mut Buffer) {
@@ -309,7 +301,6 @@ impl CrabDocsApp {
                 self.next_doc();
             }
             KeyCode::Char('r') => self.refresh_selected_document(),
-            KeyCode::Tab => self.mode = Mode::Admin,
             KeyCode::Char('i') => {
                 if self.documents.is_empty() {
                     self.popup_text = Some("No Document To Edit")
@@ -327,10 +318,6 @@ impl CrabDocsApp {
             _ => {}
         }
         false
-    }
-
-    fn admin_mode_event(&mut self, code: KeyCode) {
-        todo!()
     }
 
     fn insert_character(&mut self, c: char) {
@@ -379,14 +366,15 @@ impl CrabDocsApp {
         self.selected_document_modified = false;
     }
 
-    fn render_prompt(&self, area: Rect, buf: &mut Buffer) {
+    fn render_prompt(&self, frame: &mut Frame) {
+        let area = popup_area(frame.area(), 40, 6);
+        let buf = frame.buffer_mut();
         let block = Block::bordered().title("Enter document name");
         let popup_inner = block.inner(area);
         Clear.render(area, buf);
         block.render(area, buf);
         let [message, remainder] =
-            Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
-                .areas(popup_inner);
+            Layout::vertical([Constraint::Length(3), Constraint::Fill(1)]).areas(popup_inner);
         Paragraph::new(self.prompt_input.as_ref().unwrap().as_str())
             .block(Block::bordered())
             .render(message, buf);
@@ -395,7 +383,14 @@ impl CrabDocsApp {
         Line::from("Press Enter to submit, Esc to cancel").render(submit, buf);
     }
 
-    fn render_popup(&self, area: Rect, buf: &mut Buffer) {
+    fn render_popup(&self, frame: &mut Frame) {
+        const DISMISS_TEXT: &str = "Press Esc to close message";
+        let area = popup_area(
+            frame.area(),
+            (self.popup_text.unwrap().len().max(DISMISS_TEXT.len()) + 4) as u16,
+            5,
+        );
+        let buf = frame.buffer_mut();
         let block = Block::bordered().title("Message");
         let popup_inner = block.inner(area);
         Clear.render(area, buf);
@@ -404,7 +399,7 @@ impl CrabDocsApp {
             Layout::vertical([Constraint::Percentage(60), Constraint::Percentage(40)])
                 .areas(popup_inner);
         Line::from(self.popup_text.unwrap()).render(message, buf);
-        Line::from("Press Esc to close").render(dismiss, buf);
+        Line::from(DISMISS_TEXT).render(dismiss, buf);
     }
 
     fn delete_document(&mut self, force: bool) {
@@ -454,19 +449,20 @@ impl CrabDocsApp {
     }
 
     fn add_document(&mut self, force: bool) {
-        self.prompt_input = Some(String::new());
+        self.prompt_input = Some(BLOCK_ASCII.to_string());
         self.force_add = force;
     }
 
     fn submit_addition(&mut self) {
         let input = self.prompt_input.take().unwrap();
+        let input = &input[..input.len() - BLOCK_ASCII.len_utf8()];
         if input.is_empty() {
             self.popup_text = Some("Name can't be empty");
             return;
         }
         match self
             .client
-            .write_document(&input, "", if self.force_add { None } else { Some(0) })
+            .write_document(input, "", if self.force_add { None } else { Some(0) })
         {
             Ok(_) => {
                 self.refresh_data(true);
@@ -486,29 +482,14 @@ impl Widget for &mut CrabDocsApp {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let title = Line::from("CrabDocs".bold());
         let block = Block::bordered().title(title.centered());
-        let [remainder, tabs_area] =
-            Layout::vertical([Constraint::Percentage(95), Constraint::Percentage(5)])
-                .areas(block.inner(area));
-        Tabs::new(["User", "Admin"])
-            .select(if matches!(self.mode, Mode::Admin) {
-                1
-            } else {
-                0
-            })
-            .block(Block::bordered())
-            .render(tabs_area, buf);
         let [remainder, keybinds] =
             Layout::vertical([Constraint::Percentage(90), Constraint::Percentage(10)])
-                .areas(remainder);
+                .areas(block.inner(area));
         Paragraph::new(self.mode.to_keybinds())
             .wrap(Wrap { trim: true })
             .block(Block::bordered())
             .render(keybinds, buf);
-        if matches!(self.mode, Mode::Admin) {
-            self.render_admin(remainder, buf);
-        } else {
-            self.render_user(remainder, buf);
-        }
+        self.render_user(remainder, buf);
         block.render(area, buf);
     }
 }
@@ -524,9 +505,9 @@ const fn alternate_colors(i: usize) -> Color {
     }
 }
 
-fn popup_area(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
-    let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
-    let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+fn popup_area(area: Rect, length: u16, height: u16) -> Rect {
+    let vertical = Layout::vertical([Constraint::Length(height)]).flex(Flex::Center);
+    let horizontal = Layout::horizontal([Constraint::Length(length)]).flex(Flex::Center);
     let [area] = vertical.areas(area);
     let [area] = horizontal.areas(area);
     area
