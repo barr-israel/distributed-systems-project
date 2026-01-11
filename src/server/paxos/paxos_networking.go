@@ -11,6 +11,7 @@ import (
 	"server/etcd"
 	"server/util"
 
+	clientv3 "go.etcd.io/etcd/client/v3"
 	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -59,7 +60,6 @@ type PaxosServerState struct {
 
 	// variables only relevant to the current leader
 
-	// TODO: do we actually need this lock
 	// lock used to serialize actions performed on the leader, ensures that when the leader replies to a linearized read, there is no ongoing paxos
 	leaderLock sync.Mutex
 	// whether the leader Paxos algorithm is currently running(to prevent running it twice at the same time for no benefit)
@@ -99,9 +99,9 @@ func (server *PaxosServerState) Close() {
 // This is done by repeatedly finding or promoting a leader that is already participating,
 // and asking it for the current state.
 // If a Paxos instance is currently running, the recovery will complete when it ends.
-func (server *PaxosServerState) Recover(ctx context.Context) {
+func (server *PaxosServerState) Recover() {
 	for {
-		readyPeers := server.etcdClient.GetReadyPeers(ctx)
+		readyPeers := server.etcdClient.GetReadyPeers(server.ctx)
 		for _, peer := range readyPeers.Kvs {
 			peerIDString := string(peer.Key[len("ready/"):])
 			slog.Debug("got ready peer", slog.String("peer ID", peerIDString))
@@ -109,14 +109,14 @@ func (server *PaxosServerState) Recover(ctx context.Context) {
 			if err != nil {
 				util.SlogPanic("can't parse peer ID")
 			}
-			leader, err := server.peers[peerID].SuggestPromoteSelf(ctx, &emptypb.Empty{})
+			leader, err := server.peers[peerID].SuggestPromoteSelf(server.ctx, &emptypb.Empty{})
 			if err != nil {
 				slog.Warn("Failed promoting peer", slog.Uint64("Peer ID", peerID))
 				continue
 			}
 			server.leader = leader.Leader
 			slog.Debug("Found leader", slog.Uint64("leader ID", server.leader))
-			state, err := server.peers[server.leader].RequestState(ctx, &emptypb.Empty{})
+			state, err := server.peers[server.leader].RequestState(server.ctx, &emptypb.Empty{})
 			if err != nil {
 				slog.Warn("Failed to get state from leader", slog.Uint64("Leader ID", leader.Leader))
 				continue
@@ -161,6 +161,46 @@ func (server *PaxosServerState) servegRPC() {
 	}
 }
 
+func (server *PaxosServerState) TryRecover() {
+	slog.Info("Checking peers' status")
+	res, err := server.etcdClient.Client.Get(context.Background(), "ready/", clientv3.WithPrefix(), clientv3.WithCountOnly())
+	if err != nil {
+		util.SlogPanic("Error reading from etcd")
+	}
+	readyCount := res.Count
+	slog.Info("", slog.Int64("ready", res.Count))
+	// will only see when the cluster has already started running
+	if readyCount > int64(config.PaxosMemberCount/2) {
+		slog.Info("Enough peers already up, trying to recover")
+		server.etcdClient.PublishReady()
+		server.Recover()
+		return
+	}
+	// publish ready when youre sure there is no state to recover
+	server.etcdClient.PublishReady()
+	server.refreshLeader(server.ctx)
+	slog.Info("Waiting for enough peers to start")
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	watchChannel := server.etcdClient.Client.Watch(ctx, "ready/", clientv3.WithPrefix(), clientv3.WithRev(res.Header.Revision+1))
+	for update := range watchChannel {
+		for _, e := range update.Events {
+			switch e.Type {
+			case clientv3.EventTypePut:
+				readyCount++
+				if readyCount > int64(config.PaxosMemberCount/2) {
+					cancelFunc()
+					slog.Info("Enough peers connected, starting")
+					return
+				}
+			case clientv3.EventTypeDelete:
+				readyCount--
+			}
+		}
+	}
+	cancelFunc()
+	util.SlogPanic("Watch failed before enough peers connected")
+}
+
 // SetupGRPC sets up the server
 func SetupGRPC(ctx context.Context, cli *etcd.EtcdClient) *PaxosServerState {
 	connections := make([]*grpc.ClientConn, config.PaxosMemberCount)
@@ -177,13 +217,7 @@ func SetupGRPC(ctx context.Context, cli *etcd.EtcdClient) *PaxosServerState {
 	incomingRequests := make(chan *LocalWriteRequest, config.PaxosMaxReqPerRound)
 	server := &PaxosServerState{ctx: ctx, etcdClient: cli, connections: connections, peers: peers, incomingRequests: incomingRequests, ongoingPaxos: make(map[uint64]*PaxosInstance), data: make(map[string]*DataEntry), minPaxosID: 1}
 	server.commitCond = *sync.NewCond(&server.acceptorLock)
-	if config.Recover {
-		server.Recover(ctx)
-	} else {
-		server.refreshLeader(ctx)
-	}
-	cli.PublishReady()
-	cli.WaitForEnoughReady()
+	server.TryRecover()
 	go server.servegRPC()
 	return server
 }

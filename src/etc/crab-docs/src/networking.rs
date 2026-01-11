@@ -8,11 +8,6 @@ const SERVER_ADDRESSES: [&str; 3] = [
     "http://localhost:8081",
     "http://localhost:8082",
 ];
-const LIST_ADDRESSES: [&str; 3] = [
-    "http://localhost:8080/list",
-    "http://localhost:8081/list",
-    "http://localhost:8082/list",
-];
 
 #[derive(Debug, Deserialize)]
 pub struct DocumentReadResponse {
@@ -54,10 +49,10 @@ pub struct Client {
 }
 
 impl Client {
-    fn next_server(&mut self) -> usize {
+    fn next_server(&mut self) -> &'static str {
         let next = self.next_server_to_use;
         self.next_server_to_use = (self.next_server_to_use + 1) % SERVER_ADDRESSES.len();
-        next
+        SERVER_ADDRESSES[next]
     }
     pub fn new() -> Client {
         Client {
@@ -70,7 +65,7 @@ impl Client {
             let next = self.next_server();
             if let Ok(r) = self
                 .http_client
-                .get(LIST_ADDRESSES[next])
+                .get(format!("{}/keys", next))
                 .header("Linearized", "1")
                 .send()
                 .and_then(|r| r.json())
@@ -85,13 +80,11 @@ impl Client {
             let next = self.next_server();
             if let Ok(r) = self
                 .http_client
-                .get(SERVER_ADDRESSES[next])
-                .header("key", &doc_name)
+                .get(format!("{}/keys/{doc_name}", next))
                 .header("Linearized", "1")
                 .send()
                 .and_then(|r| r.json::<DocumentReadResponse>())
             {
-                // r.value = r.value.replace("\\\\","\\")
                 return r;
             }
         }
@@ -102,8 +95,7 @@ impl Client {
             let next = self.next_server();
             if let Ok(r) = self
                 .http_client
-                .get(SERVER_ADDRESSES[next])
-                .header("key", &doc_name)
+                .get(format!("{}/keys/{doc_name}", next))
                 .header("Linearized", "1")
                 .header("Revision-Only", "1")
                 .send()
@@ -117,10 +109,7 @@ impl Client {
         let doc_name = doc_name.replace("\\", "\\\\");
         loop {
             let next = self.next_server();
-            let mut req = self
-                .http_client
-                .delete(SERVER_ADDRESSES[next])
-                .header("key", &doc_name);
+            let mut req = self.http_client.delete(format!("{}/keys/{doc_name}", next));
             if let Some(rev) = revision {
                 req = req.header("revision", rev);
             }
@@ -148,9 +137,8 @@ impl Client {
             let next = self.next_server();
             let mut req = self
                 .http_client
-                .put(SERVER_ADDRESSES[next])
-                .header("key", &doc_name)
-                .header("value", &content);
+                .put(format!("{}/keys/{doc_name}", next))
+                .body(content.to_string());
             if let Some(rev) = revision {
                 req = req.header("revision", rev);
             }

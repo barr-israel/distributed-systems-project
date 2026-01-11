@@ -35,8 +35,6 @@ var (
 	HTTPListenAddress string = ""
 	// TTL for the etcd lease
 	EtcdLeaseTTL int64 = 0
-	// whether to recover the state of the database(otherwise start from scratch)
-	Recover bool = false
 	// whether to output verbose(Debug level) output(otherwise Info level)
 	Verbose bool = false
 )
@@ -45,7 +43,6 @@ var (
 func SetupConf() {
 	paxosID := flag.Int("id", -1, "peer ID for this server, must be unique across the cluster")
 	flag.BoolVar(&Verbose, "v", false, "verbose output, activates debug level logging")
-	flag.BoolVar(&Recover, "recover", false, "Perform state recovery")
 	flag.Parse()
 	if *paxosID < 0 {
 		util.SlogPanic("a non-negative --id <paxos id> is required")

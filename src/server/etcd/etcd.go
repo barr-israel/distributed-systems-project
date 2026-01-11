@@ -17,43 +17,10 @@ import (
 )
 
 type EtcdClient struct {
-	client          *clientv3.Client
+	Client          *clientv3.Client
 	leaseID         clientv3.LeaseID
 	keepAliveCancel context.CancelFunc
 	keepAliveDone   chan struct{}
-}
-
-// WaitForEnoughReady waits for more than half of the peers to be ready
-func (client *EtcdClient) WaitForEnoughReady() {
-	slog.Info("Waiting for enough peers to start")
-	res, err := client.client.Get(context.Background(), "ready/", clientv3.WithPrefix(), clientv3.WithCountOnly())
-	if err != nil {
-		util.SlogPanic("Error reading from etcd")
-	}
-	readyCount := res.Count
-	if readyCount > int64(config.PaxosMemberCount/2) {
-		slog.Info("Enough peers connected, starting")
-		return
-	}
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	watchChannel := client.client.Watch(ctx, "ready/", clientv3.WithPrefix(), clientv3.WithRev(res.Header.Revision+1))
-	for update := range watchChannel {
-		for _, e := range update.Events {
-			switch e.Type {
-			case clientv3.EventTypePut:
-				readyCount++
-				if readyCount > int64(config.PaxosMemberCount/2) {
-					cancelFunc()
-					slog.Info("Enough peers connected, starting")
-					return
-				}
-			case clientv3.EventTypeDelete:
-				readyCount--
-			}
-		}
-	}
-	cancelFunc()
-	util.SlogPanic("Watch failed before enough peers connected")
 }
 
 // reads a string from the etcd server
@@ -94,7 +61,7 @@ func (client *EtcdClient) PublishReady() {
 	myReadyKey := "ready/" + paxosIDStr
 	cmp := clientv3.Compare(clientv3.CreateRevision(myReadyKey), "=", 0)
 	put := clientv3.OpPut(myReadyKey, config.PaxosListenAddress, clientv3.WithLease(client.leaseID))
-	res, err := client.client.Txn(context.Background()).If(cmp).Then(put).Commit()
+	res, err := client.Client.Txn(context.Background()).If(cmp).Then(put).Commit()
 	if err != nil {
 		util.SlogPanic("Error registering self")
 	}
@@ -107,7 +74,7 @@ func (client *EtcdClient) PublishReady() {
 func (client *EtcdClient) Close() {
 	client.keepAliveCancel()
 	<-client.keepAliveDone
-	err := client.client.Close()
+	err := client.Client.Close()
 	if err != nil {
 		slog.Error("Error closing etcd server")
 	}
@@ -127,8 +94,9 @@ func keepAlive(ctx context.Context, cli *clientv3.Client, leaseID clientv3.Lease
 	_, err = cli.Revoke(revokeCtx, leaseID)
 	if err != nil {
 		slog.Error("Error revoking lease")
+	} else {
+		slog.Debug("Lease revoked")
 	}
-	slog.Debug("Lease revoked")
 	close(doneChannel)
 	cancel()
 }
@@ -149,7 +117,7 @@ func EtcdSetup() EtcdClient {
 	keepAliveDone := make(chan struct{})
 	go keepAlive(kaCtx, cli, lease.ID, keepAliveDone)
 	slog.Info("etcd client connected")
-	client := EtcdClient{client: cli, leaseID: lease.ID, keepAliveCancel: kaCancel, keepAliveDone: keepAliveDone}
+	client := EtcdClient{Client: cli, leaseID: lease.ID, keepAliveCancel: kaCancel, keepAliveDone: keepAliveDone}
 	return client
 }
 
@@ -165,7 +133,7 @@ func (client *EtcdClient) RefreshLeader(ctx context.Context) uint64 {
 
 // GetReadyPeers returns the list of peers that are ready
 func (client *EtcdClient) GetReadyPeers(ctx context.Context) *clientv3.GetResponse {
-	alivePeers, err := client.client.Get(ctx, "ready/", clientv3.WithPrefix())
+	alivePeers, err := client.Client.Get(ctx, "ready/", clientv3.WithPrefix())
 	if err != nil {
 		util.SlogPanic("Cant get alive peers list")
 	}
@@ -175,7 +143,7 @@ func (client *EtcdClient) GetReadyPeers(ctx context.Context) *clientv3.GetRespon
 // GetPeerAddress gets the gRPC listen address of a given peer
 func (client *EtcdClient) GetPeerAddress(ctx context.Context, peerID uint64) string {
 	key := "paxos_listen_address/" + strconv.FormatUint(peerID, 10)
-	res, err := client.client.Get(ctx, key)
+	res, err := client.Client.Get(ctx, key)
 	if err != nil || res.Count == 0 {
 		util.SlogPanic("Error reading peer listen address from etcd", slog.Uint64("Peer ID", peerID))
 	}
@@ -188,7 +156,7 @@ func (client *EtcdClient) tryBecomeLeader(ctx context.Context) uint64 {
 	cmp := clientv3.Compare(clientv3.CreateRevision("leader"), "=", 0)
 	put := clientv3.OpPut("leader", strconv.FormatUint(uint64(config.MyPeerID), 10), clientv3.WithLease(client.leaseID))
 	get := clientv3.OpGet("leader")
-	res, err := client.client.Txn(ctx).If(cmp).Then(put).Else(get).Commit()
+	res, err := client.Client.Txn(ctx).If(cmp).Then(put).Else(get).Commit()
 	if err != nil {
 		util.SlogPanic("Error trying to become leader")
 	}
@@ -202,7 +170,7 @@ func (client *EtcdClient) tryBecomeLeader(ctx context.Context) uint64 {
 }
 
 func (client *EtcdClient) tryGetLeader(ctx context.Context) (uint64, error) {
-	res, err := client.client.Get(ctx, "leader")
+	res, err := client.Client.Get(ctx, "leader")
 	if err != nil {
 		util.SlogPanic("Error checking leader")
 	}
