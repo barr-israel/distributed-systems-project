@@ -9,6 +9,7 @@ import (
 	"server/cluster"
 	"server/config"
 	"server/etcd"
+	"server/httpserver"
 )
 
 func main() {
@@ -21,7 +22,7 @@ func main() {
 	slog.Info("Server starting", slog.Uint64("Peer ID", config.MyPeerID))
 	client := etcd.EtcdSetup()
 	paxosServer := cluster.SetupGRPC(context.Background(), &client)
-	StartHTTPServer(paxosServer)
+	httpserver.StartHTTPServer(paxosServer)
 	awaitInterrupt()
 	slog.Info("Shutting down")
 	client.Close()

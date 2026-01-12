@@ -21,9 +21,8 @@ func (server *ServerState) WriteToLeader(_ context.Context, msg *Action) (*Write
 }
 
 // ReadRevisionFromLeader performs a linearized read of a revision of a given key
-func (server *ServerState) ReadRevisionFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadRevisionReply, error) {
-	server.leaderLock.Lock()
-	defer server.leaderLock.Unlock()
+func (server *ServerState) ReadRevisionFromLeader(ctx context.Context, msg *ReadRequestMessage) (*ReadRevisionReply, error) {
+	server.refreshLeader(ctx)
 	if server.leaderPeerID != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}
@@ -38,9 +37,8 @@ func (server *ServerState) ReadRevisionFromLeader(_ context.Context, msg *ReadRe
 }
 
 // ReadFromLeader performs a linearized read of a value and revision of a given key
-func (server *ServerState) ReadFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadReply, error) {
-	server.leaderLock.Lock()
-	defer server.leaderLock.Unlock()
+func (server *ServerState) ReadFromLeader(ctx context.Context, msg *ReadRequestMessage) (*ReadReply, error) {
+	server.refreshLeader(ctx)
 	if server.leaderPeerID != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}
@@ -55,9 +53,8 @@ func (server *ServerState) ReadFromLeader(_ context.Context, msg *ReadRequestMes
 }
 
 // ReadListFromLeader performs a linearized read of all the keys and their revisions
-func (server *ServerState) ReadListFromLeader(_ context.Context, msg *ListRequest) (*KeyRevsList, error) {
-	server.leaderLock.Lock()
-	defer server.leaderLock.Unlock()
+func (server *ServerState) ReadListFromLeader(ctx context.Context, msg *ListRequest) (*KeyRevsList, error) {
+	server.refreshLeader(ctx)
 	if server.leaderPeerID != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}

@@ -1,4 +1,7 @@
-package main
+/*
+Package httpserver is responsible for running the HTTP server serving client requests
+*/
+package httpserver
 
 import (
 	"context"
@@ -17,7 +20,7 @@ import (
 func StartHTTPServer(paxosServer *cluster.ServerState) *http.Server {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /keys/{key}", func(writer http.ResponseWriter, request *http.Request) { handleGet(writer, request, paxosServer) })
-	mux.HandleFunc("PUT /keys/{key}", func(writer http.ResponseWriter, request *http.Request) { handlePost(writer, request, paxosServer) })
+	mux.HandleFunc("PUT /keys/{key}", func(writer http.ResponseWriter, request *http.Request) { handlePut(writer, request, paxosServer) })
 	mux.HandleFunc("DELETE /keys/{key}", func(writer http.ResponseWriter, request *http.Request) { handleDelete(writer, request, paxosServer) })
 	mux.HandleFunc("/keys", func(writer http.ResponseWriter, request *http.Request) { listHandler(writer, request, paxosServer) })
 	server := &http.Server{Addr: config.HTTPListenAddress, Handler: mux}
@@ -124,7 +127,7 @@ func handleGet(writer http.ResponseWriter, request *http.Request, paxosServer *c
 // Available Parameters:
 // revision - if supplied, the write will only be applied if it matches the current revision of the key
 // async - if supplied, this endpoint will reply immediately without feedback and the write will be performed asynchronously
-func handlePost(writer http.ResponseWriter, request *http.Request, paxosServer *cluster.ServerState) {
+func handlePut(writer http.ResponseWriter, request *http.Request, paxosServer *cluster.ServerState) {
 	slog.Info("Received HTTP PUT", slog.String("url", request.URL.String()))
 	body := request.Body
 	value, err := io.ReadAll(body)
@@ -145,7 +148,7 @@ func handleDelete(writer http.ResponseWriter, request *http.Request, paxosServer
 	handleWrite(request, paxosServer, writer, nil)
 }
 
-// combined implementation for the POST and DELETE endpoints
+// combined implementation for the PUT and DELETE endpoints
 func handleWrite(request *http.Request, paxosServer *cluster.ServerState, writer http.ResponseWriter, value *string) {
 	key := request.PathValue("key")
 	async := request.URL.Query().Get("async") != ""

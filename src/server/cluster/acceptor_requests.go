@@ -212,6 +212,9 @@ func (server *ServerState) commitActions(actionLocal *[]ActionLocal, paxosID uin
 					} else {
 						request.replyChannel <- LocalWriteReply{Success: success, Revision: 0}
 					}
+					if action.revision != nil {
+						success = false
+					}
 					if action.value != nil {
 						slog.Info("Commited write", slog.String("key", action.key), slog.String("value", *action.value))
 					} else {
