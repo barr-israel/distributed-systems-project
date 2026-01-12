@@ -123,7 +123,7 @@ impl CrabDocsApp {
         if force || t.duration_since(self.last_refresh) > Duration::from_millis(500) {
             let updated_keys = self.client.read_keys();
             for new_doc in updated_keys {
-                // if we have an out of date document we delete its content and update the revision
+                // if we have an out of date document we mark it as updated and update the revision
                 let search_result = self
                     .documents
                     .binary_search_by(|doc| doc.name.cmp(&new_doc.key));
@@ -458,6 +458,10 @@ impl CrabDocsApp {
         let input = &input[..input.len() - BLOCK_ASCII.len_utf8()];
         if input.is_empty() {
             self.popup_text = Some("Name can't be empty");
+            return;
+        }
+        if input.contains("\\") {
+            self.popup_text = Some("Name can't contain \\");
             return;
         }
         match self

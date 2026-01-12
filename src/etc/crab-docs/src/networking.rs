@@ -32,11 +32,6 @@ impl KeyReply {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct RevisionReadResponse {
-    revision: u64,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct WriteResponse {
     success: bool,
     revision: u64,
@@ -61,26 +56,28 @@ impl Client {
         }
     }
     pub fn read_keys(&mut self) -> Vec<KeyReply> {
+        let params = &[("linearized", "1")];
         loop {
             let next = self.next_server();
-            if let Ok(r) = self
-                .http_client
-                .get(format!("{}/keys", next))
-                .header("Linearized", "1")
-                .send()
-                .and_then(|r| r.json())
-            {
+            let url =
+                reqwest::Url::parse_with_params(format!("{}/keys", next).as_str(), params).unwrap();
+            if let Ok(r) = self.http_client.get(url).send().and_then(|r| r.json()) {
                 return r;
             }
         }
     }
     pub fn read_document(&mut self, doc_name: &str) -> DocumentReadResponse {
-        let doc_name = doc_name.replace("\\", "\\\\");
+        // let doc_name = doc_name.replace("\\", "\\\\");
         loop {
             let next = self.next_server();
+            let url = reqwest::Url::parse_with_params(
+                format!("{}/keys/{doc_name}", next).as_str(),
+                &[("linearized", "1")],
+            )
+            .unwrap();
             if let Ok(r) = self
                 .http_client
-                .get(format!("{}/keys/{doc_name}", next))
+                .get(url)
                 .header("Linearized", "1")
                 .send()
                 .and_then(|r| r.json::<DocumentReadResponse>())
@@ -89,31 +86,26 @@ impl Client {
             }
         }
     }
-    pub fn read_revision(&mut self, doc_name: &str) -> u64 {
-        let doc_name = doc_name.replace("\\", "\\\\");
+    pub fn delete_document(&mut self, doc_name: &str, revision: Option<u64>) -> Result<u64, u64> {
+        // let doc_name = doc_name.replace("\\", "\\\\");
+        let params: &[(&str, String)] = if let Some(rev) = revision {
+            &[("revision", rev.to_string())]
+        } else {
+            &[]
+        };
         loop {
             let next = self.next_server();
+            let url = reqwest::Url::parse_with_params(
+                format!("{}/keys/{doc_name}", next).as_str(),
+                params,
+            )
+            .unwrap();
             if let Ok(r) = self
                 .http_client
-                .get(format!("{}/keys/{doc_name}", next))
-                .header("Linearized", "1")
-                .header("Revision-Only", "1")
+                .delete(url)
                 .send()
-                .and_then(|r| r.json::<RevisionReadResponse>())
+                .and_then(|r| r.json::<WriteResponse>())
             {
-                return r.revision;
-            }
-        }
-    }
-    pub fn delete_document(&mut self, doc_name: &str, revision: Option<u64>) -> Result<u64, u64> {
-        let doc_name = doc_name.replace("\\", "\\\\");
-        loop {
-            let next = self.next_server();
-            let mut req = self.http_client.delete(format!("{}/keys/{doc_name}", next));
-            if let Some(rev) = revision {
-                req = req.header("revision", rev);
-            }
-            if let Ok(r) = req.send().and_then(|r| r.json::<WriteResponse>()) {
                 if r.success {
                     return Ok(r.revision);
                 } else {
@@ -128,21 +120,30 @@ impl Client {
         content: &str,
         revision: Option<u64>,
     ) -> Result<u64, u64> {
-        let doc_name = doc_name.replace("\\", "\\\\");
+        // let doc_name = doc_name.replace("\\", "\\\\");
         let content = content
             .replace("\\", "\\\\")
             .replace("\n", "\\n")
             .replace("\r", "\\r");
+        let params: &[(&str, String)] = if let Some(rev) = revision {
+            &[("revision", rev.to_string())]
+        } else {
+            &[]
+        };
         loop {
             let next = self.next_server();
-            let mut req = self
+            let url = reqwest::Url::parse_with_params(
+                format!("{}/keys/{doc_name}", next).as_str(),
+                params,
+            )
+            .unwrap();
+            if let Ok(r) = self
                 .http_client
-                .put(format!("{}/keys/{doc_name}", next))
-                .body(content.to_string());
-            if let Some(rev) = revision {
-                req = req.header("revision", rev);
-            }
-            if let Ok(r) = req.send().and_then(|r| r.json::<WriteResponse>()) {
+                .put(url)
+                .body(content.to_string())
+                .send()
+                .and_then(|r| r.json::<WriteResponse>())
+            {
                 if r.success {
                     return Ok(r.revision);
                 } else {
