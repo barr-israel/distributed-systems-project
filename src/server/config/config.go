@@ -5,16 +5,15 @@ package config
 
 import (
 	"flag"
+	"server/util"
 	"strconv"
 	"time"
-
-	"server/util"
 )
 
 // various configuration values needed across the program, some obtained from command line argument and some from the etcd server
 var (
 	// the address of the etcd server
-	EtcdListenAddress string = "127.0.0.1:2379"
+	EtcdListenAddress string = "etcd:2379"
 	// the peer ID of this server
 	MyPeerID uint64 = 0
 	// amount of servers participating in the Paxos algorithm

@@ -1,7 +1,8 @@
+package cluster
+
 /*
-Package paxos is responsible for communication between the servers, using the paxos algorithm to order incoming requests
-*/
-package paxos
+* Implementation for the gRPC endpoints directed at paxos acceptors, and related functions such as commiting and log compaction.
+ */
 
 import (
 	"context"
@@ -15,7 +16,7 @@ import (
 )
 
 // gets the paxos instance of a given Paxos ID, or creates a new one if it doesnt exist
-func (server *PaxosServerState) getOrCreatePaxosInstance(paxosID uint64) *PaxosInstance {
+func (server *ServerState) getOrCreatePaxosInstance(paxosID uint64) *PaxosInstance {
 	instance, contains := server.ongoingPaxos[paxosID]
 	if !contains {
 		slog.Info("Starting new paxos", slog.Uint64("Paxos ID", paxosID))
@@ -27,7 +28,7 @@ func (server *PaxosServerState) getOrCreatePaxosInstance(paxosID uint64) *PaxosI
 
 // RELIABLY sends an ACCEPTED message,
 // To ensure the message arrives even if the current peer crashes, it retries until the peer replies
-func (server *PaxosServerState) sendAccepted(peerID uint64, msg *AcceptedMessage) {
+func (server *ServerState) sendAccepted(peerID uint64, msg *AcceptedMessage) {
 	slog.Debug("Sending accepted", slog.Uint64("Peer ID", uint64(peerID)), slog.String("msg", msg.String()))
 	peer := server.peers[peerID]
 	_, err := peer.Accepted(context.Background(), msg)
@@ -41,7 +42,7 @@ func (server *PaxosServerState) sendAccepted(peerID uint64, msg *AcceptedMessage
 
 // RELIABLY requests the commited ID of a peer, to be used for log compaction
 // To ensure the message arrives even if the current peer crashes, it retries until the peer replies
-func (server *PaxosServerState) sendCommitedIDRequest(peerID uint64, responses chan<- uint64) {
+func (server *ServerState) sendCommitedIDRequest(peerID uint64, responses chan<- uint64) {
 	slog.Debug("Sending min ID request", slog.Uint64("Peer ID", uint64(peerID)))
 	peer := server.peers[peerID]
 	res, err := peer.GetCommitedPaxosID(server.ctx, &emptypb.Empty{})
@@ -55,7 +56,7 @@ func (server *PaxosServerState) sendCommitedIDRequest(peerID uint64, responses c
 }
 
 // Prepare is the gRPC endpoint for PREPARE messages
-func (server *PaxosServerState) Prepare(ctx context.Context, msg *PrepareMessage) (*PromiseMessage, error) {
+func (server *ServerState) Prepare(ctx context.Context, msg *PrepareMessage) (*PromiseMessage, error) {
 	time.Sleep(config.PaxosArtificialDelay)
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
@@ -70,7 +71,7 @@ func (server *PaxosServerState) Prepare(ctx context.Context, msg *PrepareMessage
 }
 
 // Accept is the gRPC endpoint for ACCEPT messages
-func (server *PaxosServerState) Accept(ctx context.Context, msg *AcceptMessage) (*AcceptResponse, error) {
+func (server *ServerState) Accept(ctx context.Context, msg *AcceptMessage) (*AcceptResponse, error) {
 	time.Sleep(config.PaxosArtificialDelay)
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
@@ -91,7 +92,7 @@ func (server *PaxosServerState) Accept(ctx context.Context, msg *AcceptMessage) 
 }
 
 // Accepted is the gRPC endpoint for ACCEPTED messages
-func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessage) (*emptypb.Empty, error) {
+func (server *ServerState) Accepted(ctx context.Context, msg *AcceptedMessage) (*emptypb.Empty, error) {
 	time.Sleep(config.PaxosArtificialDelay)
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
@@ -123,7 +124,7 @@ func (server *PaxosServerState) Accepted(ctx context.Context, msg *AcceptedMessa
 // FillInProposal is the gRPC endpoint to request a missing proposal from a peer
 // It is only called in response to this acceptor sending an ACCEPTED for the given round,
 // so the missing proposal will be present as long as this acceptor did not crash since
-func (server *PaxosServerState) FillInProposal(ctx context.Context, msg *FillInProposalMessage) (*Proposal, error) {
+func (server *ServerState) FillInProposal(ctx context.Context, msg *FillInProposalMessage) (*Proposal, error) {
 	time.Sleep(config.PaxosArtificialDelay)
 	slog.Debug("Received Fill In Request", slog.Uint64("Paxos ID", msg.PaxosId), slog.Uint64("round", msg.Round))
 	// This request only arrives we are still waiting for this peer to acknowledge our "ACCEPTED",
@@ -137,19 +138,19 @@ func (server *PaxosServerState) FillInProposal(ctx context.Context, msg *FillInP
 }
 
 // GetCommitedPaxosID is the gRPC endpoint to get the commitedPaxosID from a peer
-func (server *PaxosServerState) GetCommitedPaxosID(ctx context.Context, _ *emptypb.Empty) (*CommitedPaxosID, error) {
+func (server *ServerState) GetCommitedPaxosID(ctx context.Context, _ *emptypb.Empty) (*CommitedPaxosID, error) {
 	time.Sleep(config.PaxosArtificialDelay)
 	return &CommitedPaxosID{CommitedPaxosId: server.commitedPaxosID}, nil
 }
 
 // try to commit any uncommited paxos instanced IN ORDER
 // assumes acceptorLock is held
-func (server *PaxosServerState) tryCommitPaxos() {
+func (server *ServerState) tryCommitPaxos() {
 	paxos := server.ongoingPaxos[server.commitedPaxosID+1]
 	for paxos != nil && paxos.decided {
 		server.commitedPaxosID++
 		server.commitActions(paxos.getDecidedValue(), server.commitedPaxosID)
-		slog.Info("Commited paxos:", slog.Uint64("paxosID", server.commitedPaxosID), slog.Any("actions", paxos.proposals))
+		slog.Info("Commited paxos:", slog.Uint64("paxosID", server.commitedPaxosID))
 		if paxos.done {
 			server.deletePaxos(server.commitedPaxosID)
 		}
@@ -162,7 +163,7 @@ func (server *PaxosServerState) tryCommitPaxos() {
 
 // Perform log compaction by querying the commitedPaxosID of all other peers and deleting any Paxos instance with a lower ID
 // assumes acceptorLock is held
-func (server *PaxosServerState) cleanUpOldPaxos() {
+func (server *ServerState) cleanUpOldPaxos() {
 	// minPaxosID will be 1 above commitedPaxosID if there are no old instances
 	if 1+server.commitedPaxosID-server.minPaxosID > config.PaxosCleanupThreshold {
 		responses := make(chan uint64, config.PaxosMemberCount)
@@ -182,7 +183,7 @@ func (server *PaxosServerState) cleanUpOldPaxos() {
 }
 
 // commit a given set of actions into the database with a given Paxos ID as the revision
-func (server *PaxosServerState) commitActions(actionLocal *[]ActionLocal, paxosID uint64) {
+func (server *ServerState) commitActions(actionLocal *[]ActionLocal, paxosID uint64) {
 	activeRequestsCount := len(server.activeWrites)
 	for _, action := range *actionLocal {
 		entry, exists := server.data[action.key]
@@ -197,7 +198,7 @@ func (server *PaxosServerState) commitActions(actionLocal *[]ActionLocal, paxosI
 			server.data[action.key] = &DataEntry{Value: action.value, Revision: paxosID}
 		}
 		// reply to active writes, only leader has active writes
-		if server.leader == config.MyPeerID {
+		if server.leaderPeerID == config.MyPeerID {
 			for i := 0; i < activeRequestsCount; i++ {
 				request := server.activeWrites[i]
 				// checking just the key is sufficient because any group of writes can be commited by commiting one of them and pretending the rest were commited just before it
@@ -230,7 +231,7 @@ func (server *PaxosServerState) commitActions(actionLocal *[]ActionLocal, paxosI
 }
 
 // delete the paxos instance corresponding to the given Paxos ID(because all peers already send ACCEPTED or commited this instance)
-func (server *PaxosServerState) deletePaxos(paxosID uint64) {
+func (server *ServerState) deletePaxos(paxosID uint64) {
 	slog.Debug("Deleting paxos", slog.Uint64("paxos ID", paxosID))
 	delete(server.ongoingPaxos, paxosID)
 	server.minPaxosID = min(server.minPaxosID, paxosID+1)

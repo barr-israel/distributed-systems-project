@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v6.33.1
-// source: paxos.proto
+// source: grpc.proto
 
-package paxos
+package cluster
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -33,7 +33,7 @@ type Action struct {
 
 func (x *Action) Reset() {
 	*x = Action{}
-	mi := &file_paxos_proto_msgTypes[0]
+	mi := &file_grpc_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +45,7 @@ func (x *Action) String() string {
 func (*Action) ProtoMessage() {}
 
 func (x *Action) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[0]
+	mi := &file_grpc_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +58,7 @@ func (x *Action) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Action.ProtoReflect.Descriptor instead.
 func (*Action) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{0}
+	return file_grpc_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *Action) GetKey() string {
@@ -91,7 +91,7 @@ type Proposal struct {
 
 func (x *Proposal) Reset() {
 	*x = Proposal{}
-	mi := &file_paxos_proto_msgTypes[1]
+	mi := &file_grpc_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -103,7 +103,7 @@ func (x *Proposal) String() string {
 func (*Proposal) ProtoMessage() {}
 
 func (x *Proposal) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[1]
+	mi := &file_grpc_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -116,7 +116,7 @@ func (x *Proposal) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Proposal.ProtoReflect.Descriptor instead.
 func (*Proposal) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{1}
+	return file_grpc_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Proposal) GetActions() []*Action {
@@ -136,7 +136,7 @@ type WriteReply struct {
 
 func (x *WriteReply) Reset() {
 	*x = WriteReply{}
-	mi := &file_paxos_proto_msgTypes[2]
+	mi := &file_grpc_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -148,7 +148,7 @@ func (x *WriteReply) String() string {
 func (*WriteReply) ProtoMessage() {}
 
 func (x *WriteReply) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[2]
+	mi := &file_grpc_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -161,7 +161,7 @@ func (x *WriteReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WriteReply.ProtoReflect.Descriptor instead.
 func (*WriteReply) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{2}
+	return file_grpc_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *WriteReply) GetSuccess() bool {
@@ -187,7 +187,7 @@ type ReadRequestMessage struct {
 
 func (x *ReadRequestMessage) Reset() {
 	*x = ReadRequestMessage{}
-	mi := &file_paxos_proto_msgTypes[3]
+	mi := &file_grpc_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -199,7 +199,7 @@ func (x *ReadRequestMessage) String() string {
 func (*ReadRequestMessage) ProtoMessage() {}
 
 func (x *ReadRequestMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[3]
+	mi := &file_grpc_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -212,7 +212,7 @@ func (x *ReadRequestMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadRequestMessage.ProtoReflect.Descriptor instead.
 func (*ReadRequestMessage) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{3}
+	return file_grpc_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ReadRequestMessage) GetKey() string {
@@ -232,7 +232,7 @@ type ReadReply struct {
 
 func (x *ReadReply) Reset() {
 	*x = ReadReply{}
-	mi := &file_paxos_proto_msgTypes[4]
+	mi := &file_grpc_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -244,7 +244,7 @@ func (x *ReadReply) String() string {
 func (*ReadReply) ProtoMessage() {}
 
 func (x *ReadReply) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[4]
+	mi := &file_grpc_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -257,7 +257,7 @@ func (x *ReadReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadReply.ProtoReflect.Descriptor instead.
 func (*ReadReply) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{4}
+	return file_grpc_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ReadReply) GetValue() string {
@@ -283,7 +283,7 @@ type ReadRevisionReply struct {
 
 func (x *ReadRevisionReply) Reset() {
 	*x = ReadRevisionReply{}
-	mi := &file_paxos_proto_msgTypes[5]
+	mi := &file_grpc_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -295,7 +295,7 @@ func (x *ReadRevisionReply) String() string {
 func (*ReadRevisionReply) ProtoMessage() {}
 
 func (x *ReadRevisionReply) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[5]
+	mi := &file_grpc_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -308,7 +308,7 @@ func (x *ReadRevisionReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadRevisionReply.ProtoReflect.Descriptor instead.
 func (*ReadRevisionReply) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{5}
+	return file_grpc_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ReadRevisionReply) GetRevision() uint64 {
@@ -328,7 +328,7 @@ type PrepareMessage struct {
 
 func (x *PrepareMessage) Reset() {
 	*x = PrepareMessage{}
-	mi := &file_paxos_proto_msgTypes[6]
+	mi := &file_grpc_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -340,7 +340,7 @@ func (x *PrepareMessage) String() string {
 func (*PrepareMessage) ProtoMessage() {}
 
 func (x *PrepareMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[6]
+	mi := &file_grpc_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -353,7 +353,7 @@ func (x *PrepareMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PrepareMessage.ProtoReflect.Descriptor instead.
 func (*PrepareMessage) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{6}
+	return file_grpc_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *PrepareMessage) GetPaxosId() uint64 {
@@ -382,7 +382,7 @@ type PromiseMessage struct {
 
 func (x *PromiseMessage) Reset() {
 	*x = PromiseMessage{}
-	mi := &file_paxos_proto_msgTypes[7]
+	mi := &file_grpc_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -394,7 +394,7 @@ func (x *PromiseMessage) String() string {
 func (*PromiseMessage) ProtoMessage() {}
 
 func (x *PromiseMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[7]
+	mi := &file_grpc_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -407,7 +407,7 @@ func (x *PromiseMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromiseMessage.ProtoReflect.Descriptor instead.
 func (*PromiseMessage) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{7}
+	return file_grpc_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *PromiseMessage) GetLastGoodRound() uint64 {
@@ -442,7 +442,7 @@ type AcceptMessage struct {
 
 func (x *AcceptMessage) Reset() {
 	*x = AcceptMessage{}
-	mi := &file_paxos_proto_msgTypes[8]
+	mi := &file_grpc_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -454,7 +454,7 @@ func (x *AcceptMessage) String() string {
 func (*AcceptMessage) ProtoMessage() {}
 
 func (x *AcceptMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[8]
+	mi := &file_grpc_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -467,7 +467,7 @@ func (x *AcceptMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptMessage.ProtoReflect.Descriptor instead.
 func (*AcceptMessage) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{8}
+	return file_grpc_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *AcceptMessage) GetPaxosId() uint64 {
@@ -500,7 +500,7 @@ type AcceptResponse struct {
 
 func (x *AcceptResponse) Reset() {
 	*x = AcceptResponse{}
-	mi := &file_paxos_proto_msgTypes[9]
+	mi := &file_grpc_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -512,7 +512,7 @@ func (x *AcceptResponse) String() string {
 func (*AcceptResponse) ProtoMessage() {}
 
 func (x *AcceptResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[9]
+	mi := &file_grpc_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -525,7 +525,7 @@ func (x *AcceptResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptResponse.ProtoReflect.Descriptor instead.
 func (*AcceptResponse) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{9}
+	return file_grpc_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *AcceptResponse) GetAck() bool {
@@ -546,7 +546,7 @@ type AcceptedMessage struct {
 
 func (x *AcceptedMessage) Reset() {
 	*x = AcceptedMessage{}
-	mi := &file_paxos_proto_msgTypes[10]
+	mi := &file_grpc_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -558,7 +558,7 @@ func (x *AcceptedMessage) String() string {
 func (*AcceptedMessage) ProtoMessage() {}
 
 func (x *AcceptedMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[10]
+	mi := &file_grpc_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -571,7 +571,7 @@ func (x *AcceptedMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcceptedMessage.ProtoReflect.Descriptor instead.
 func (*AcceptedMessage) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{10}
+	return file_grpc_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AcceptedMessage) GetPaxosId() uint64 {
@@ -604,7 +604,7 @@ type PromotionReply struct {
 
 func (x *PromotionReply) Reset() {
 	*x = PromotionReply{}
-	mi := &file_paxos_proto_msgTypes[11]
+	mi := &file_grpc_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +616,7 @@ func (x *PromotionReply) String() string {
 func (*PromotionReply) ProtoMessage() {}
 
 func (x *PromotionReply) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[11]
+	mi := &file_grpc_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -629,7 +629,7 @@ func (x *PromotionReply) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromotionReply.ProtoReflect.Descriptor instead.
 func (*PromotionReply) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{11}
+	return file_grpc_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *PromotionReply) GetLeader() uint64 {
@@ -651,7 +651,7 @@ type State struct {
 
 func (x *State) Reset() {
 	*x = State{}
-	mi := &file_paxos_proto_msgTypes[12]
+	mi := &file_grpc_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -663,7 +663,7 @@ func (x *State) String() string {
 func (*State) ProtoMessage() {}
 
 func (x *State) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[12]
+	mi := &file_grpc_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -676,7 +676,7 @@ func (x *State) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use State.ProtoReflect.Descriptor instead.
 func (*State) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{12}
+	return file_grpc_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *State) GetCommitedPaxosId() uint64 {
@@ -716,7 +716,7 @@ type CommitedPaxosID struct {
 
 func (x *CommitedPaxosID) Reset() {
 	*x = CommitedPaxosID{}
-	mi := &file_paxos_proto_msgTypes[13]
+	mi := &file_grpc_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -728,7 +728,7 @@ func (x *CommitedPaxosID) String() string {
 func (*CommitedPaxosID) ProtoMessage() {}
 
 func (x *CommitedPaxosID) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[13]
+	mi := &file_grpc_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -741,7 +741,7 @@ func (x *CommitedPaxosID) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitedPaxosID.ProtoReflect.Descriptor instead.
 func (*CommitedPaxosID) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{13}
+	return file_grpc_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *CommitedPaxosID) GetCommitedPaxosId() uint64 {
@@ -761,7 +761,7 @@ type KeyRev struct {
 
 func (x *KeyRev) Reset() {
 	*x = KeyRev{}
-	mi := &file_paxos_proto_msgTypes[14]
+	mi := &file_grpc_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -773,7 +773,7 @@ func (x *KeyRev) String() string {
 func (*KeyRev) ProtoMessage() {}
 
 func (x *KeyRev) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[14]
+	mi := &file_grpc_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -786,7 +786,7 @@ func (x *KeyRev) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyRev.ProtoReflect.Descriptor instead.
 func (*KeyRev) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{14}
+	return file_grpc_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *KeyRev) GetKey() string {
@@ -812,7 +812,7 @@ type KeyRevsList struct {
 
 func (x *KeyRevsList) Reset() {
 	*x = KeyRevsList{}
-	mi := &file_paxos_proto_msgTypes[15]
+	mi := &file_grpc_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -824,7 +824,7 @@ func (x *KeyRevsList) String() string {
 func (*KeyRevsList) ProtoMessage() {}
 
 func (x *KeyRevsList) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[15]
+	mi := &file_grpc_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -837,7 +837,7 @@ func (x *KeyRevsList) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KeyRevsList.ProtoReflect.Descriptor instead.
 func (*KeyRevsList) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{15}
+	return file_grpc_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *KeyRevsList) GetKeyrevs() []*KeyRev {
@@ -856,7 +856,7 @@ type ListRequest struct {
 
 func (x *ListRequest) Reset() {
 	*x = ListRequest{}
-	mi := &file_paxos_proto_msgTypes[16]
+	mi := &file_grpc_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -868,7 +868,7 @@ func (x *ListRequest) String() string {
 func (*ListRequest) ProtoMessage() {}
 
 func (x *ListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[16]
+	mi := &file_grpc_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -881,7 +881,7 @@ func (x *ListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRequest.ProtoReflect.Descriptor instead.
 func (*ListRequest) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{16}
+	return file_grpc_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListRequest) GetOmitDeleted() bool {
@@ -901,7 +901,7 @@ type FillInProposalMessage struct {
 
 func (x *FillInProposalMessage) Reset() {
 	*x = FillInProposalMessage{}
-	mi := &file_paxos_proto_msgTypes[17]
+	mi := &file_grpc_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -913,7 +913,7 @@ func (x *FillInProposalMessage) String() string {
 func (*FillInProposalMessage) ProtoMessage() {}
 
 func (x *FillInProposalMessage) ProtoReflect() protoreflect.Message {
-	mi := &file_paxos_proto_msgTypes[17]
+	mi := &file_grpc_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -926,7 +926,7 @@ func (x *FillInProposalMessage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FillInProposalMessage.ProtoReflect.Descriptor instead.
 func (*FillInProposalMessage) Descriptor() ([]byte, []int) {
-	return file_paxos_proto_rawDescGZIP(), []int{17}
+	return file_grpc_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *FillInProposalMessage) GetPaxosId() uint64 {
@@ -943,11 +943,12 @@ func (x *FillInProposalMessage) GetRound() uint64 {
 	return 0
 }
 
-var File_paxos_proto protoreflect.FileDescriptor
+var File_grpc_proto protoreflect.FileDescriptor
 
-const file_paxos_proto_rawDesc = "" +
+const file_grpc_proto_rawDesc = "" +
 	"\n" +
-	"\vpaxos.proto\x1a\x1bgoogle/protobuf/empty.proto\"m\n" +
+	"\n" +
+	"grpc.proto\x1a\x1bgoogle/protobuf/empty.proto\"m\n" +
 	"\x06Action\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x19\n" +
 	"\x05value\x18\x02 \x01(\tH\x00R\x05value\x88\x01\x01\x12\x1f\n" +
@@ -1007,35 +1008,36 @@ const file_paxos_proto_rawDesc = "" +
 	"\vomitDeleted\x18\x01 \x01(\bR\vomitDeleted\"H\n" +
 	"\x15FillInProposalMessage\x12\x19\n" +
 	"\bpaxos_id\x18\x01 \x01(\x04R\apaxosId\x12\x14\n" +
-	"\x05round\x18\x02 \x01(\x04R\x05round2\xde\x04\n" +
+	"\x05round\x18\x02 \x01(\x04R\x05round2\xd5\x02\n" +
 	"\x05Paxos\x12-\n" +
 	"\aPrepare\x12\x0f.PrepareMessage\x1a\x0f.PromiseMessage\"\x00\x12+\n" +
 	"\x06Accept\x12\x0e.AcceptMessage\x1a\x0f.AcceptResponse\"\x00\x126\n" +
-	"\bAccepted\x12\x10.AcceptedMessage\x1a\x16.google.protobuf.Empty\"\x00\x12'\n" +
+	"\bAccepted\x12\x10.AcceptedMessage\x1a\x16.google.protobuf.Empty\"\x00\x12?\n" +
+	"\x12SuggestPromoteSelf\x12\x16.google.protobuf.Empty\x1a\x0f.PromotionReply\"\x00\x12@\n" +
+	"\x12GetCommitedPaxosID\x12\x16.google.protobuf.Empty\x1a\x10.CommitedPaxosID\"\x00\x125\n" +
+	"\x0eFillInProposal\x12\x16.FillInProposalMessage\x1a\t.Proposal\"\x002\x99\x02\n" +
+	"\x0eLeaderRequests\x12'\n" +
 	"\rWriteToLeader\x12\a.Action\x1a\v.WriteReply\"\x00\x123\n" +
 	"\x0eReadFromLeader\x12\x13.ReadRequestMessage\x1a\n" +
 	".ReadReply\"\x00\x12C\n" +
 	"\x16ReadRevisionFromLeader\x12\x13.ReadRequestMessage\x1a\x12.ReadRevisionReply\"\x00\x122\n" +
-	"\x12ReadListFromLeader\x12\f.ListRequest\x1a\f.KeyRevsList\"\x00\x12?\n" +
-	"\x12SuggestPromoteSelf\x12\x16.google.protobuf.Empty\x1a\x0f.PromotionReply\"\x00\x120\n" +
-	"\fRequestState\x12\x16.google.protobuf.Empty\x1a\x06.State\"\x00\x12@\n" +
-	"\x12GetCommitedPaxosID\x12\x16.google.protobuf.Empty\x1a\x10.CommitedPaxosID\"\x00\x125\n" +
-	"\x0eFillInProposal\x12\x16.FillInProposalMessage\x1a\t.Proposal\"\x00B\tZ\a./paxosb\x06proto3"
+	"\x12ReadListFromLeader\x12\f.ListRequest\x1a\f.KeyRevsList\"\x00\x120\n" +
+	"\fRequestState\x12\x16.google.protobuf.Empty\x1a\x06.State\"\x00B\vZ\t./clusterb\x06proto3"
 
 var (
-	file_paxos_proto_rawDescOnce sync.Once
-	file_paxos_proto_rawDescData []byte
+	file_grpc_proto_rawDescOnce sync.Once
+	file_grpc_proto_rawDescData []byte
 )
 
-func file_paxos_proto_rawDescGZIP() []byte {
-	file_paxos_proto_rawDescOnce.Do(func() {
-		file_paxos_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_paxos_proto_rawDesc), len(file_paxos_proto_rawDesc)))
+func file_grpc_proto_rawDescGZIP() []byte {
+	file_grpc_proto_rawDescOnce.Do(func() {
+		file_grpc_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_grpc_proto_rawDesc), len(file_grpc_proto_rawDesc)))
 	})
-	return file_paxos_proto_rawDescData
+	return file_grpc_proto_rawDescData
 }
 
-var file_paxos_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
-var file_paxos_proto_goTypes = []any{
+var file_grpc_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_grpc_proto_goTypes = []any{
 	(*Action)(nil),                // 0: Action
 	(*Proposal)(nil),              // 1: Proposal
 	(*WriteReply)(nil),            // 2: WriteReply
@@ -1056,7 +1058,7 @@ var file_paxos_proto_goTypes = []any{
 	(*FillInProposalMessage)(nil), // 17: FillInProposalMessage
 	(*emptypb.Empty)(nil),         // 18: google.protobuf.Empty
 }
-var file_paxos_proto_depIdxs = []int32{
+var file_grpc_proto_depIdxs = []int32{
 	0,  // 0: Proposal.actions:type_name -> Action
 	1,  // 1: PromiseMessage.proposal:type_name -> Proposal
 	1,  // 2: AcceptMessage.proposal:type_name -> Proposal
@@ -1065,25 +1067,25 @@ var file_paxos_proto_depIdxs = []int32{
 	6,  // 5: Paxos.Prepare:input_type -> PrepareMessage
 	8,  // 6: Paxos.Accept:input_type -> AcceptMessage
 	10, // 7: Paxos.Accepted:input_type -> AcceptedMessage
-	0,  // 8: Paxos.WriteToLeader:input_type -> Action
-	3,  // 9: Paxos.ReadFromLeader:input_type -> ReadRequestMessage
-	3,  // 10: Paxos.ReadRevisionFromLeader:input_type -> ReadRequestMessage
-	16, // 11: Paxos.ReadListFromLeader:input_type -> ListRequest
-	18, // 12: Paxos.SuggestPromoteSelf:input_type -> google.protobuf.Empty
-	18, // 13: Paxos.RequestState:input_type -> google.protobuf.Empty
-	18, // 14: Paxos.GetCommitedPaxosID:input_type -> google.protobuf.Empty
-	17, // 15: Paxos.FillInProposal:input_type -> FillInProposalMessage
+	18, // 8: Paxos.SuggestPromoteSelf:input_type -> google.protobuf.Empty
+	18, // 9: Paxos.GetCommitedPaxosID:input_type -> google.protobuf.Empty
+	17, // 10: Paxos.FillInProposal:input_type -> FillInProposalMessage
+	0,  // 11: LeaderRequests.WriteToLeader:input_type -> Action
+	3,  // 12: LeaderRequests.ReadFromLeader:input_type -> ReadRequestMessage
+	3,  // 13: LeaderRequests.ReadRevisionFromLeader:input_type -> ReadRequestMessage
+	16, // 14: LeaderRequests.ReadListFromLeader:input_type -> ListRequest
+	18, // 15: LeaderRequests.RequestState:input_type -> google.protobuf.Empty
 	7,  // 16: Paxos.Prepare:output_type -> PromiseMessage
 	9,  // 17: Paxos.Accept:output_type -> AcceptResponse
 	18, // 18: Paxos.Accepted:output_type -> google.protobuf.Empty
-	2,  // 19: Paxos.WriteToLeader:output_type -> WriteReply
-	4,  // 20: Paxos.ReadFromLeader:output_type -> ReadReply
-	5,  // 21: Paxos.ReadRevisionFromLeader:output_type -> ReadRevisionReply
-	15, // 22: Paxos.ReadListFromLeader:output_type -> KeyRevsList
-	11, // 23: Paxos.SuggestPromoteSelf:output_type -> PromotionReply
-	12, // 24: Paxos.RequestState:output_type -> State
-	13, // 25: Paxos.GetCommitedPaxosID:output_type -> CommitedPaxosID
-	1,  // 26: Paxos.FillInProposal:output_type -> Proposal
+	11, // 19: Paxos.SuggestPromoteSelf:output_type -> PromotionReply
+	13, // 20: Paxos.GetCommitedPaxosID:output_type -> CommitedPaxosID
+	1,  // 21: Paxos.FillInProposal:output_type -> Proposal
+	2,  // 22: LeaderRequests.WriteToLeader:output_type -> WriteReply
+	4,  // 23: LeaderRequests.ReadFromLeader:output_type -> ReadReply
+	5,  // 24: LeaderRequests.ReadRevisionFromLeader:output_type -> ReadRevisionReply
+	15, // 25: LeaderRequests.ReadListFromLeader:output_type -> KeyRevsList
+	12, // 26: LeaderRequests.RequestState:output_type -> State
 	16, // [16:27] is the sub-list for method output_type
 	5,  // [5:16] is the sub-list for method input_type
 	5,  // [5:5] is the sub-list for extension type_name
@@ -1091,29 +1093,29 @@ var file_paxos_proto_depIdxs = []int32{
 	0,  // [0:5] is the sub-list for field type_name
 }
 
-func init() { file_paxos_proto_init() }
-func file_paxos_proto_init() {
-	if File_paxos_proto != nil {
+func init() { file_grpc_proto_init() }
+func file_grpc_proto_init() {
+	if File_grpc_proto != nil {
 		return
 	}
-	file_paxos_proto_msgTypes[0].OneofWrappers = []any{}
-	file_paxos_proto_msgTypes[4].OneofWrappers = []any{}
-	file_paxos_proto_msgTypes[7].OneofWrappers = []any{}
+	file_grpc_proto_msgTypes[0].OneofWrappers = []any{}
+	file_grpc_proto_msgTypes[4].OneofWrappers = []any{}
+	file_grpc_proto_msgTypes[7].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_paxos_proto_rawDesc), len(file_paxos_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_grpc_proto_rawDesc), len(file_grpc_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   18,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
-		GoTypes:           file_paxos_proto_goTypes,
-		DependencyIndexes: file_paxos_proto_depIdxs,
-		MessageInfos:      file_paxos_proto_msgTypes,
+		GoTypes:           file_grpc_proto_goTypes,
+		DependencyIndexes: file_grpc_proto_depIdxs,
+		MessageInfos:      file_grpc_proto_msgTypes,
 	}.Build()
-	File_paxos_proto = out.File
-	file_paxos_proto_goTypes = nil
-	file_paxos_proto_depIdxs = nil
+	File_grpc_proto = out.File
+	file_grpc_proto_goTypes = nil
+	file_grpc_proto_depIdxs = nil
 }

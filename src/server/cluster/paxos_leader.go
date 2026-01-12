@@ -1,4 +1,4 @@
-package paxos
+package cluster
 
 import (
 	context "context"
@@ -13,7 +13,7 @@ import (
 
 // RELIABLY send a PREPARE message to an acceptor
 // To ensure the message arrives even if the current peer crashes, it retries until the peer replies
-func (server *PaxosServerState) sendPrepare(ctx context.Context, peerID uint64, msg *PrepareMessage, responses chan<- *PromiseMessage) {
+func (server *ServerState) sendPrepare(ctx context.Context, peerID uint64, msg *PrepareMessage, responses chan<- *PromiseMessage) {
 	slog.Debug("Sending prepare", slog.Uint64("Peer ID", uint64(peerID)), slog.String("msg", msg.String()))
 	peer := server.peers[peerID]
 	res, err := peer.Prepare(ctx, msg)
@@ -32,7 +32,7 @@ func (server *PaxosServerState) sendPrepare(ctx context.Context, peerID uint64, 
 
 // RELIABLY send a ACCEPT message to an acceptor
 // To ensure the message arrives even if the current peer crashes, it retries until the peer replies
-func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, msg *AcceptMessage, responses chan<- *AcceptResponse) {
+func (server *ServerState) sendAccept(ctx context.Context, peerID uint64, msg *AcceptMessage, responses chan<- *AcceptResponse) {
 	slog.Debug("Sending accept", slog.Uint64("Peer ID", uint64(peerID)), slog.String("msg", msg.String()))
 	peer := server.peers[peerID]
 	res, err := peer.Accept(ctx, msg)
@@ -50,7 +50,7 @@ func (server *PaxosServerState) sendAccept(ctx context.Context, peerID uint64, m
 }
 
 // fill the activeWrites buffer from the incomingRequests channel before starting a Paxos instance
-func (server *PaxosServerState) fillActiveWrites() {
+func (server *ServerState) fillActiveWrites() {
 	req := <-server.incomingRequests
 	// only lock after a request has arrived to prevent holding the lock unnecessarily
 	server.leaderLock.Lock()
@@ -62,7 +62,7 @@ func (server *PaxosServerState) fillActiveWrites() {
 }
 
 // run the leader Paxos algorithm as long as this peer is the leader
-func (server *PaxosServerState) runLeader() {
+func (server *ServerState) runLeader() {
 	for {
 		thisPaxosID := server.commitedPaxosID + 1
 		server.fillActiveWrites()
@@ -122,7 +122,7 @@ func (server *PaxosServerState) runLeader() {
 			// skip ahead of every peer
 			round = max(round, largestReceivedRound) + 1
 			server.refreshLeader(context.Background())
-			if server.leader != config.MyPeerID {
+			if server.leaderPeerID != config.MyPeerID {
 				// this leader was demoted
 				return
 			}
@@ -134,7 +134,7 @@ func (server *PaxosServerState) runLeader() {
 }
 
 // waits for a given paxos ID to be commited
-func (server *PaxosServerState) waitForCommit(paxosID uint64) {
+func (server *ServerState) waitForCommit(paxosID uint64) {
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	for server.commitedPaxosID != paxosID {
@@ -142,69 +142,14 @@ func (server *PaxosServerState) waitForCommit(paxosID uint64) {
 	}
 }
 
-// WriteToLeader performs a linearized conditional write into the database
-func (server *PaxosServerState) WriteToLeader(_ context.Context, msg *Action) (*WriteReply, error) {
-	replyChannel := make(chan LocalWriteReply, 1)
-	request := LocalWriteRequest{key: msg.Key, value: msg.Value, revision: msg.Revision, replyChannel: replyChannel}
-	server.incomingRequests <- &request
-	reply := <-replyChannel
-	return &WriteReply{Success: reply.Success, Revision: reply.Revision}, nil
-}
-
-// ReadRevisionFromLeader performs a linearized read of a revision of a given key
-func (server *PaxosServerState) ReadRevisionFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadRevisionReply, error) {
-	server.leaderLock.Lock()
-	defer server.leaderLock.Unlock()
-	if server.leader != config.MyPeerID {
-		return nil, errors.New("server is not the leader")
-	}
-	server.acceptorLock.Lock()
-	defer server.acceptorLock.Unlock()
-	entry := server.data[msg.Key]
-	if entry != nil {
-		return &ReadRevisionReply{Revision: entry.Revision}, nil
-	} else {
-		return &ReadRevisionReply{Revision: 0}, nil
-	}
-}
-
-// ReadFromLeader performs a linearized read of a value and revision of a given key
-func (server *PaxosServerState) ReadFromLeader(_ context.Context, msg *ReadRequestMessage) (*ReadReply, error) {
-	server.leaderLock.Lock()
-	defer server.leaderLock.Unlock()
-	if server.leader != config.MyPeerID {
-		return nil, errors.New("server is not the leader")
-	}
-	server.acceptorLock.Lock()
-	defer server.acceptorLock.Unlock()
-	entry := server.data[msg.Key]
-	if entry != nil {
-		return &ReadReply{Value: entry.Value, Revision: entry.Revision}, nil
-	} else {
-		return &ReadReply{Value: nil, Revision: 0}, nil
-	}
-}
-
-// ReadListFromLeader performs a linearized read of all the keys and their revisions
-func (server *PaxosServerState) ReadListFromLeader(_ context.Context, msg *ListRequest) (*KeyRevsList, error) {
-	server.leaderLock.Lock()
-	defer server.leaderLock.Unlock()
-	if server.leader != config.MyPeerID {
-		return nil, errors.New("server is not the leader")
-	}
-	server.acceptorLock.Lock()
-	defer server.acceptorLock.Unlock()
-	return &KeyRevsList{Keyrevs: server.getKeys(msg.OmitDeleted)}, nil
-}
-
 // RequestState replies with all the data needed for a recovering peer to join in the next Paxos instance
-func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty) (*State, error) {
+func (server *ServerState) RequestState(_ context.Context, _ *emptypb.Empty) (*State, error) {
 	server.leaderLock.Lock()
 	defer server.leaderLock.Unlock()
-	if server.leader != config.MyPeerID {
+	if server.leaderPeerID != config.MyPeerID {
 		return nil, errors.New("server is not the leader")
 	}
-	slog.Debug("got state req")
+	slog.Debug("got state request")
 	server.acceptorLock.Lock()
 	defer server.acceptorLock.Unlock()
 	dataState := make([]*Action, len(server.data))
@@ -217,7 +162,7 @@ func (server *PaxosServerState) RequestState(_ context.Context, _ *emptypb.Empty
 }
 
 // SuggestPromoteSelf gets the leader, attempts to become the leader if there isn't one, and replies with the current leader
-func (server *PaxosServerState) SuggestPromoteSelf(ctx context.Context, _ *emptypb.Empty) (*PromotionReply, error) {
+func (server *ServerState) SuggestPromoteSelf(ctx context.Context, _ *emptypb.Empty) (*PromotionReply, error) {
 	server.refreshLeader(ctx)
-	return &PromotionReply{Leader: server.leader}, nil
+	return &PromotionReply{Leader: server.leaderPeerID}, nil
 }

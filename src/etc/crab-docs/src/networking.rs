@@ -3,10 +3,12 @@ use serde::Deserialize;
 
 use crate::Document;
 
-const SERVER_ADDRESSES: [&str; 3] = [
+const SERVER_ADDRESSES: [&str; 5] = [
     "http://localhost:8080",
     "http://localhost:8081",
     "http://localhost:8082",
+    "http://localhost:8083",
+    "http://localhost:8084",
 ];
 
 #[derive(Debug, Deserialize)]

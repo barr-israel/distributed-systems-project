@@ -6,9 +6,9 @@ import (
 	"os"
 	"os/signal"
 
+	"server/cluster"
 	"server/config"
 	"server/etcd"
-	"server/paxos"
 )
 
 func main() {
@@ -18,8 +18,9 @@ func main() {
 	} else {
 		slog.SetLogLoggerLevel(slog.LevelInfo)
 	}
+	slog.Info("Server starting", slog.Uint64("Peer ID", config.MyPeerID))
 	client := etcd.EtcdSetup()
-	paxosServer := paxos.SetupGRPC(context.Background(), &client)
+	paxosServer := cluster.SetupGRPC(context.Background(), &client)
 	StartHTTPServer(paxosServer)
 	awaitInterrupt()
 	slog.Info("Shutting down")

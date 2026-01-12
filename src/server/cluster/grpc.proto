@@ -1,6 +1,6 @@
 syntax = "proto3";
 import "google/protobuf/empty.proto";
-option go_package = "./paxos";
+option go_package = "./cluster";
 
 message Action{
   string key = 1;
@@ -95,12 +95,16 @@ service Paxos{
   rpc Prepare(PrepareMessage) returns (PromiseMessage) {}
   rpc Accept(AcceptMessage) returns (AcceptResponse){}
   rpc Accepted(AcceptedMessage) returns (google.protobuf.Empty){}
+  rpc SuggestPromoteSelf(google.protobuf.Empty) returns (PromotionReply){}
+  rpc GetCommitedPaxosID(google.protobuf.Empty) returns (CommitedPaxosID){}
+  rpc FillInProposal(FillInProposalMessage) returns (Proposal){}
+}
+
+service LeaderRequests{
   rpc WriteToLeader(Action) returns (WriteReply){}
   rpc ReadFromLeader(ReadRequestMessage) returns (ReadReply){}
   rpc ReadRevisionFromLeader(ReadRequestMessage) returns (ReadRevisionReply){}
   rpc ReadListFromLeader(ListRequest) returns (KeyRevsList){}
-  rpc SuggestPromoteSelf(google.protobuf.Empty) returns (PromotionReply){}
   rpc RequestState(google.protobuf.Empty) returns (State){}
-  rpc GetCommitedPaxosID(google.protobuf.Empty) returns (CommitedPaxosID){}
-  rpc FillInProposal(FillInProposalMessage) returns (Proposal){}
 }
+
