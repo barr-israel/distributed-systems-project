@@ -33,3 +33,7 @@ go.work.sum
 
 # etcd data directory
 default.etcd/
+
+
+# report pdf
+report.pdf
