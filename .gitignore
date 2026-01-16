@@ -37,3 +37,6 @@ default.etcd/
 
 # report pdf
 report.pdf
+
+# rust related
+target
