@@ -1,5 +1,9 @@
 package cluster
 
+/*
+* The state and functions implementing a Paxos acceptor for a single Paxos instance
+ */
+
 import (
 	"errors"
 	"log/slog"

@@ -1,7 +1,7 @@
 package cluster
 
 /*
-* Implementation for the gRPC endpoints directed at paxos acceptors, and related functions such as commiting and log compaction.
+* Implementation for the gRPC endpoints directed at Paxos acceptors, and related functions such as commiting and log compaction.
  */
 
 import (
@@ -128,7 +128,7 @@ func (server *ServerState) FillInProposal(ctx context.Context, msg *FillInPropos
 	time.Sleep(config.PaxosArtificialDelay)
 	slog.Debug("Received Fill In Request", slog.Uint64("Paxos ID", msg.PaxosId), slog.Uint64("round", msg.Round))
 	// This request only arrives we are still waiting for this peer to acknowledge our "ACCEPTED",
-	// so locking is unncessary because the proposal for the given round is already "locked"(locking here will also cause a dead-lock)
+	// so locking is unncessary because the proposal for the given round is already set and won't change.
 	proposal, exists := server.ongoingPaxos[msg.PaxosId]
 	if !exists {
 		// possible if we just recovered from a crash
@@ -158,11 +158,10 @@ func (server *ServerState) tryCommitPaxos() {
 	}
 	// notify a waiting leader the commit they are waiting for may have been commited
 	server.commitCond.Broadcast()
-	server.cleanUpOldPaxos()
+	go server.cleanUpOldPaxos()
 }
 
-// Perform log compaction by querying the commitedPaxosID of all other peers and deleting any Paxos instance with a lower ID
-// assumes acceptorLock is held
+// Perform active log compaction by querying the commitedPaxosID of all other peers and deleting any Paxos instance with a lower ID
 func (server *ServerState) cleanUpOldPaxos() {
 	// minPaxosID will be 1 above commitedPaxosID if there are no old instances
 	if 1+server.commitedPaxosID-server.minPaxosID > config.PaxosCleanupThreshold {
@@ -175,10 +174,16 @@ func (server *ServerState) cleanUpOldPaxos() {
 			commitedID := <-responses
 			maxCommitedID = max(maxCommitedID, commitedID)
 		}
+		if server.minPaxosID > maxCommitedID {
+			// already up to date
+			return
+		}
+		server.acceptorLock.Lock()
 		for paxosID := server.minPaxosID; paxosID <= maxCommitedID; paxosID++ {
 			server.deletePaxos(paxosID)
 		}
 		server.minPaxosID = maxCommitedID + 1
+		server.acceptorLock.Unlock()
 	}
 }
 

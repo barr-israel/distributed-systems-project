@@ -54,6 +54,11 @@ func (server *ServerState) Recover(readyPeers *clientv3.GetResponse) {
 			slog.Info("Recovered state", slog.Uint64("Leader ID", leader.Leader), slog.Uint64("Commited Paxos ID", server.commitedPaxosID))
 			return
 		}
+		var err error
+		readyPeers, err = server.etcdClient.Client.Get(context.Background(), "ready/", clientv3.WithPrefix())
+		if err != nil {
+			util.SlogPanic("Error reading from etcd")
+		}
 	}
 }
 
@@ -77,6 +82,8 @@ func (server *ServerState) servegRPC() {
 	}
 }
 
+// TryRecover checks if a state recovery is needed, and if it is, recovers the state
+// a state recovery is needed when more than n/2 of the peers are already up, since if less than n/2 are up, the cluster is an initial boot up sequence.
 func (server *ServerState) TryRecover() {
 	slog.Info("Checking peers' status")
 	readyPeers, err := server.etcdClient.Client.Get(context.Background(), "ready/", clientv3.WithPrefix())

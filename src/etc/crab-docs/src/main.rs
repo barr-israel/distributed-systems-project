@@ -335,6 +335,9 @@ impl CrabDocsApp {
     }
 
     fn next_doc(&mut self) {
+        if self.documents.is_empty() {
+            return;
+        }
         self.selected_document_index = if self.selected_document_index == self.documents.len() - 1 {
             0
         } else {
@@ -344,6 +347,9 @@ impl CrabDocsApp {
     }
 
     fn prev_doc(&mut self) {
+        if self.documents.is_empty() {
+            return;
+        }
         self.selected_document_index = if self.selected_document_index == 0 {
             self.documents.len() - 1
         } else {

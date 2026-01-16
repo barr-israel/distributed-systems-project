@@ -16,7 +16,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 15s
+      start_period: 10s
   init:
     build: ./setup_script/
     depends_on:
@@ -31,6 +31,12 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/bin/httpcheck", "http://localhost:8080/keys"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     command: --id 0 -v
   paxos1:
     image: paxos-server:dev
@@ -39,6 +45,12 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/bin/httpcheck", "http://localhost:8081/keys"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     command: --id 1 -v
   paxos2:
     image: paxos-server:dev
@@ -48,6 +60,12 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/bin/httpcheck", "http://localhost:8082/keys"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     command: --id 2 -v
   paxos3:
     image: paxos-server:dev
@@ -57,6 +75,12 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/bin/httpcheck", "http://localhost:8083/keys"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     command: --id 3 -v
   paxos4:
     image: paxos-server:dev
@@ -67,4 +91,10 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/bin/httpcheck", "http://localhost:8084/keys"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     command: --id 4 -v
