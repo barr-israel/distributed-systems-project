@@ -1,12 +1,12 @@
 ## Server Cluster Running Instructions
-Open the `./src/docker/` directory.
+Open the `./src/docker/` directory.  
 Launch the containers(requires `docker` and `docker-compose` to be installed, the containers will be built automatically):
 ```bash
 docker compose up
 ```
 
 ## Demo Application Running Instructions
-Open the `./src/etc/crab-docs/` directory.
+Open the `./src/etc/crab-docs/` directory.  
 Compile and run the app(requires a Rust tool-chain to be installed):
 ```bash
 cargo run
